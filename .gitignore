@@ -1,0 +1,7 @@
+target/
+*.class
+*.jar
+.vscode/
+application.properties
+*.iml
+.idea/
