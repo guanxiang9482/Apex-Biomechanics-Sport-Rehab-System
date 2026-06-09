@@ -1,6 +1,7 @@
 import {useState,useEffect} from 'react';
 import { useNavigate } from 'react-router-dom';
 import {athlete,auth} from'../services/api';
+import './Dashboard.css';
 
 function AthleteDashboard(){
         const [activeSection, setActiveSection] =useState('sessions');
