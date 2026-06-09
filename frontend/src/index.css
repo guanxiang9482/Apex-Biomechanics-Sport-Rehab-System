@@ -1,45 +1,40 @@
-/* ============================================================
-   GLOBAL STYLES — Apex Biomechanics & Sports Rehab System
-   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* Import Google Font for professional typography */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-/* Reset & Base */
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
+html {
+  min-width: 320px;
+  background: #f4f7f3;
+}
+
 body {
-  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-  background-color: #0a0e1a;
-  color: #e2e8f0;
+  margin: 0;
+  min-width: 320px;
   min-height: 100vh;
+  background: #f4f7f3;
+  color: #17211f;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  touch-action: manipulation;
 }
 
 a {
-  color: #60a5fa;
-  text-decoration: none;
+  color: #0f7f81;
 }
 
-a:hover {
-  color: #93bbfc;
-}
-
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #1e293b;
-}
-::-webkit-scrollbar-thumb {
-  background: #475569;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+::selection {
+  background: rgba(15, 139, 141, 0.22);
 }

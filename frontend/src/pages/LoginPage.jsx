@@ -1,115 +1,149 @@
-import { useState} from 'react';
-import {useNavigate} from 'react-router-dom';
-import {auth} from '../services/api';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { auth } from '../services/api';
 import './LoginPage.css';
 
-function LoginPage(){
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [message, setMessage] = useState('');
-    const [activeTab, setActiveTab] =useState('login');
-    const [email, setEmail] = useState('');
-    const [fullName, setFullName] = useState('');
+const emptyForm = {
+  username: '',
+  password: '',
+  email: '',
+  fullName: '',
+  newPassword: '',
+};
 
-    const navigate = useNavigate();
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        if(!username || !password){
-          setMessage('Please fill in all fields');
-          return;
-        }
-        try{
-          const data = await auth.login(username ,password);
-          localStorage.setItem('user',JSON.stringify({
-            userId: data.userId,
-            username: data.username,
-            role: data.role,
-          }));
+function LoginPage() {
+  const [form, setForm] = useState(emptyForm);
+  const [activeTab, setActiveTab] = useState('login');
+  const [message, setMessage] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-          if(data.role === 'ATHLETE'){
-            navigate('/athlete');
-          }else if(data.role === 'THERAPIST'){
-            navigate('/therapist');
-          
-          }else if(data.role === 'ADMIN'){
-            navigate('/admin');
-          }
-        
-          }catch (error){
-            setMessage(error.message);
-          }
-        
-    };
-    const handleRegister = async (e) => {
-      e.preventDefault();
-      if(!username || !password ||!email ||!fullName){
-        setMessage('Please fill in all fields');
-        return;
-      }
-      try{
-        await auth.register(username,password,email,fullName);
-        setMessage('Registration succesfull,you can now login');
-        setActiveTab('login');
-      }catch(error){
-        setMessage(error.message);
-      }
+  const updateForm = (event) => {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const switchTab = (tab) => {
+    setActiveTab(tab);
+    setMessage(null);
+  };
+
+  const showMessage = (type, text) => {
+    setMessage({ type, text });
+  };
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const data = await auth.login(form.username.trim(), form.password);
+      const user = {
+        userId: data.userId,
+        username: data.username,
+        role: data.role,
       };
-    
 
-   return(
-  <div className="login-page">
-    <div className="login-container">
-      <div className="brand-icon">🏥</div>
-      <h1>APEX</h1>
-      <p className="subtitle">Biomechanics & Sports Rehab System</p>
+      localStorage.setItem('user', JSON.stringify(user));
+      navigate(`/${String(data.role).toLowerCase()}`);
+    } catch (error) {
+      showMessage('error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      {/* TAB BUTTONS */}
-      <div className="form-tabs">
-        <button
-          className={`tab ${activeTab === 'login' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('login'); setMessage(''); }}
-        >
-          Login
-        </button>
-        <button
-          className={`tab ${activeTab === 'register' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('register'); setMessage(''); }}
-        >
-          Register
-        </button>
-      </div>
+  const handleRegister = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setMessage(null);
 
-      {/* ERROR/SUCCESS MESSAGE */}
-      {message && <p>{message}</p>}
+    try {
+      await auth.register(
+        form.username.trim(),
+        form.password,
+        form.email.trim(),
+        form.fullName.trim(),
+      );
+      setForm(emptyForm);
+      setActiveTab('login');
+      showMessage('success', 'Registration successful. You can now sign in.');
+    } catch (error) {
+      showMessage('error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      {/* LOGIN FORM — only shows when activeTab is 'login' */}
-      {activeTab === 'login' && (
-        <form onSubmit={handleLogin}>
-          <input type="text" placeholder="Username" value={username}
-            onChange={(e) => setUsername(e.target.value)} />
-          <input type="password" placeholder="Password" value={password}
-            onChange={(e) => setPassword(e.target.value)} />
-          <button type="submit">Sign In</button>
-        </form>
-      )}
+  const handleResetPassword = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setMessage(null);
 
-      {/* REGISTER FORM — only shows when activeTab is 'register' */}
-      {activeTab === 'register' && (
-        <form onSubmit={handleRegister}>
-          <input type="text" placeholder="Full Name" value={fullName}
-            onChange={(e) => setFullName(e.target.value)} />
-          <input type="email" placeholder="Email" value={email}
-            onChange={(e) => setEmail(e.target.value)} />
-          <input type="text" placeholder="Username" value={username}
-            onChange={(e) => setUsername(e.target.value)} />
-          <input type="password" placeholder="Password" value={password}
-            onChange={(e) => setPassword(e.target.value)} />
-          <button type="submit">Create Account</button>
-        </form>
-      )}
-    </div>
-  </div>
-);
+    try {
+      await auth.resetPassword(
+        form.username.trim(),
+        form.email.trim(),
+        form.newPassword,
+      );
+      setForm(emptyForm);
+      setActiveTab('login');
+      showMessage('success', 'Password updated. Sign in with your new password.');
+    } catch (error) {
+      showMessage('error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="login-page">
+      <section className="login-container" aria-label="Apex authentication">
+        <div className="login-brand">
+          <span>Sports Rehabilitation Portal</span>
+          <h1>APEX</h1>
+          <p className="subtitle">Biomechanics & Sports Rehab System</p>
+        </div>
+
+        <div className="form-tabs" role="tablist" aria-label="Authentication mode">
+          <button className={`tab ${activeTab === 'login' ? 'active' : ''}`} type="button" onClick={() => switchTab('login')}>Login</button>
+          <button className={`tab ${activeTab === 'register' ? 'active' : ''}`} type="button" onClick={() => switchTab('register')}>Register</button>
+          <button className={`tab ${activeTab === 'reset' ? 'active' : ''}`} type="button" onClick={() => switchTab('reset')}>Reset</button>
+        </div>
+
+        {message && <p className={`message ${message.type}`}>{message.text}</p>}
+
+        {activeTab === 'login' && (
+          <form onSubmit={handleLogin}>
+            <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
+            <input name="password" type="password" placeholder="Password" value={form.password} onChange={updateForm} required />
+            <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign In'}</button>
+          </form>
+        )}
+
+        {activeTab === 'register' && (
+          <form onSubmit={handleRegister}>
+            <input name="fullName" type="text" placeholder="Full name" value={form.fullName} onChange={updateForm} required />
+            <input name="email" type="email" placeholder="Email" value={form.email} onChange={updateForm} required />
+            <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
+            <input name="password" type="password" placeholder="Password" value={form.password} onChange={updateForm} required />
+            <button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create Account'}</button>
+          </form>
+        )}
+
+        {activeTab === 'reset' && (
+          <form onSubmit={handleResetPassword}>
+            <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
+            <input name="email" type="email" placeholder="Registered email" value={form.email} onChange={updateForm} required />
+            <input name="newPassword" type="password" placeholder="New password" value={form.newPassword} onChange={updateForm} required />
+            <button type="submit" disabled={loading}>{loading ? 'Updating...' : 'Update Password'}</button>
+          </form>
+        )}
+
+      </section>
+    </main>
+  );
 }
+
 export default LoginPage;
-    

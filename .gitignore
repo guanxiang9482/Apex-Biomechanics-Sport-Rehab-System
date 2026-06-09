@@ -5,3 +5,6 @@ target/
 application.properties
 *.iml
 .idea/
+frontend/node_modules/
+frontend/dist/
+frontend/.npm-cache/
