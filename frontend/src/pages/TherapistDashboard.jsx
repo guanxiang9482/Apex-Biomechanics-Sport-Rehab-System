@@ -158,7 +158,6 @@ function TherapistDashboard() {
     <div className="dashboard">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark">A</span>
           <h2>APEX</h2>
         </div>
         <nav className="sidebar-nav">

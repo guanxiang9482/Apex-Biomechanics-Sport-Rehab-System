@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../services/api';
+import rehabHero from '../assets/rehab-hero.jpg';
 import './LoginPage.css';
 
 const emptyForm = {
@@ -99,48 +100,61 @@ function LoginPage() {
 
   return (
     <main className="login-page">
-      <section className="login-container" aria-label="Apex authentication">
-        <div className="login-brand">
-          <span>Sports Rehabilitation Portal</span>
-          <h1>APEX</h1>
-          <p className="subtitle">Biomechanics & Sports Rehab System</p>
+      <section className="login-shell">
+        <div className="login-visual" aria-hidden="true">
+          <img src={rehabHero} alt="" />
+          <div className="visual-overlay">
+            <span>Biomechanics Lab</span>
+            <h2>Track recovery, sessions, and performance in one clinical workspace.</h2>
+            <div className="visual-stats">
+              <strong>3</strong>
+              <span>Role-based portals</span>
+            </div>
+          </div>
         </div>
 
-        <div className="form-tabs" role="tablist" aria-label="Authentication mode">
-          <button className={`tab ${activeTab === 'login' ? 'active' : ''}`} type="button" onClick={() => switchTab('login')}>Login</button>
-          <button className={`tab ${activeTab === 'register' ? 'active' : ''}`} type="button" onClick={() => switchTab('register')}>Register</button>
-          <button className={`tab ${activeTab === 'reset' ? 'active' : ''}`} type="button" onClick={() => switchTab('reset')}>Reset</button>
+        <div className="login-container" aria-label="Apex authentication">
+          <div className="login-brand">
+            <span>Sports Rehabilitation Portal</span>
+            <h1>APEX</h1>
+            <p className="subtitle">Biomechanics & Sports Rehab System</p>
+          </div>
+
+          <div className="form-tabs" role="tablist" aria-label="Authentication mode">
+            <button className={`tab ${activeTab === 'login' ? 'active' : ''}`} type="button" onClick={() => switchTab('login')}>Login</button>
+            <button className={`tab ${activeTab === 'register' ? 'active' : ''}`} type="button" onClick={() => switchTab('register')}>Register</button>
+            <button className={`tab ${activeTab === 'reset' ? 'active' : ''}`} type="button" onClick={() => switchTab('reset')}>Reset</button>
+          </div>
+
+          {message && <p className={`message ${message.type}`}>{message.text}</p>}
+
+          {activeTab === 'login' && (
+            <form onSubmit={handleLogin}>
+              <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
+              <input name="password" type="password" placeholder="Password" value={form.password} onChange={updateForm} required />
+              <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign In'}</button>
+            </form>
+          )}
+
+          {activeTab === 'register' && (
+            <form onSubmit={handleRegister}>
+              <input name="fullName" type="text" placeholder="Full name" value={form.fullName} onChange={updateForm} required />
+              <input name="email" type="email" placeholder="Email" value={form.email} onChange={updateForm} required />
+              <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
+              <input name="password" type="password" placeholder="Password" value={form.password} onChange={updateForm} required />
+              <button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create Account'}</button>
+            </form>
+          )}
+
+          {activeTab === 'reset' && (
+            <form onSubmit={handleResetPassword}>
+              <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
+              <input name="email" type="email" placeholder="Registered email" value={form.email} onChange={updateForm} required />
+              <input name="newPassword" type="password" placeholder="New password" value={form.newPassword} onChange={updateForm} required />
+              <button type="submit" disabled={loading}>{loading ? 'Updating...' : 'Update Password'}</button>
+            </form>
+          )}
         </div>
-
-        {message && <p className={`message ${message.type}`}>{message.text}</p>}
-
-        {activeTab === 'login' && (
-          <form onSubmit={handleLogin}>
-            <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
-            <input name="password" type="password" placeholder="Password" value={form.password} onChange={updateForm} required />
-            <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign In'}</button>
-          </form>
-        )}
-
-        {activeTab === 'register' && (
-          <form onSubmit={handleRegister}>
-            <input name="fullName" type="text" placeholder="Full name" value={form.fullName} onChange={updateForm} required />
-            <input name="email" type="email" placeholder="Email" value={form.email} onChange={updateForm} required />
-            <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
-            <input name="password" type="password" placeholder="Password" value={form.password} onChange={updateForm} required />
-            <button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create Account'}</button>
-          </form>
-        )}
-
-        {activeTab === 'reset' && (
-          <form onSubmit={handleResetPassword}>
-            <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
-            <input name="email" type="email" placeholder="Registered email" value={form.email} onChange={updateForm} required />
-            <input name="newPassword" type="password" placeholder="New password" value={form.newPassword} onChange={updateForm} required />
-            <button type="submit" disabled={loading}>{loading ? 'Updating...' : 'Update Password'}</button>
-          </form>
-        )}
-
       </section>
     </main>
   );

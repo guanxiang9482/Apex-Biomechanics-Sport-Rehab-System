@@ -1,8 +1,11 @@
 .dashboard {
   min-height: 100vh;
   display: flex;
-  background: #f4f7f3;
-  color: #17211f;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255, 107, 91, 0.13), transparent 26%),
+    radial-gradient(circle at 88% 8%, rgba(17, 139, 147, 0.16), transparent 30%),
+    #edf3f6;
+  color: #172638;
 }
 
 .sidebar {
@@ -14,8 +17,8 @@
   flex-direction: column;
   gap: 22px;
   padding: 22px 16px;
-  background: #14332d;
-  color: #dcebe4;
+  background: linear-gradient(180deg, #142438 0%, #101a2a 100%);
+  color: #dce8ee;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -23,7 +26,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 8px 16px;
+  padding: 8px 8px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -40,10 +43,21 @@
 }
 
 .sidebar-brand h2 {
+  position: relative;
   margin: 0;
-  font-size: 1.28rem;
-  font-weight: 850;
+  font-size: 1.45rem;
+  font-weight: 900;
   letter-spacing: 0;
+}
+
+.sidebar-brand h2::after {
+  content: 'Sports Rehab';
+  display: block;
+  margin-top: 3px;
+  color: #ff8b7d;
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
 }
 
 .sidebar-nav {
@@ -79,13 +93,15 @@
 }
 
 .sidebar-nav button:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
+  transform: translateX(2px);
 }
 
 .sidebar-nav button.active {
-  background: #f4f7f3;
-  color: #14332d;
+  background: #ff6b5b;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(255, 107, 91, 0.28);
 }
 
 .logout-btn {
@@ -107,18 +123,26 @@
 }
 
 .content-header {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 22px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #dce5df;
+  padding: 28px;
+  border: 0;
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(20, 36, 56, 0.92), rgba(20, 36, 56, 0.72)),
+    url('../assets/rehab-hero.jpg') center right / cover;
+  color: #ffffff;
+  box-shadow: 0 20px 48px rgba(28, 43, 58, 0.16);
 }
 
 .eyebrow {
   margin: 0 0 6px;
-  color: #0f7f81;
+  color: #ffb1a7;
   font-size: 0.78rem;
   font-weight: 850;
   text-transform: uppercase;
@@ -126,7 +150,7 @@
 
 .content-header h1 {
   margin: 0;
-  color: #17211f;
+  color: #ffffff;
   font-size: clamp(1.55rem, 2.4vw, 2.3rem);
   line-height: 1.1;
   letter-spacing: 0;
@@ -134,7 +158,7 @@
 
 .content-header p {
   margin: 8px 0 0;
-  color: #64736d;
+  color: #dce8ee;
   font-size: 0.94rem;
 }
 
@@ -150,10 +174,11 @@
 
 .panel {
   padding: 20px;
-  background: #ffffff;
-  border: 1px solid #dce5df;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(207, 217, 223, 0.86);
   border-radius: 8px;
-  box-shadow: 0 12px 34px rgba(20, 51, 45, 0.08);
+  box-shadow: 0 14px 34px rgba(28, 43, 58, 0.09);
+  backdrop-filter: blur(14px);
 }
 
 .panel-header,
@@ -170,7 +195,7 @@
 .pattern-card h3,
 .result-panel h2 {
   margin: 0;
-  color: #17211f;
+  color: #172638;
   font-size: 1.02rem;
   line-height: 1.25;
   letter-spacing: 0;
@@ -197,13 +222,33 @@
 .metric-card,
 .card {
   background: #ffffff;
-  border: 1px solid #dce5df;
+  border: 1px solid rgba(207, 217, 223, 0.9);
   border-radius: 8px;
-  box-shadow: 0 10px 28px rgba(20, 51, 45, 0.07);
+  box-shadow: 0 12px 30px rgba(28, 43, 58, 0.08);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.stat-card:hover,
+.pattern-card:hover,
+.metric-card:hover,
+.card:hover {
+  border-color: rgba(17, 139, 147, 0.38);
+  box-shadow: 0 18px 42px rgba(28, 43, 58, 0.14);
+  transform: translateY(-3px);
 }
 
 .stat-card {
+  position: relative;
+  overflow: hidden;
   padding: 18px;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #ff6b5b, #117f87);
 }
 
 .stat-card span,
@@ -219,7 +264,7 @@
 
 .stat-card strong {
   display: block;
-  color: #0f7f81;
+  color: #117f87;
   font-size: clamp(1.35rem, 2vw, 1.95rem);
   line-height: 1.05;
 }
@@ -256,7 +301,7 @@
 }
 
 .pattern-card span {
-  color: #b96b19;
+  color: #ff6b5b;
 }
 
 .card-list {
@@ -283,7 +328,7 @@
 
 .summary-block strong,
 .result-panel strong {
-  color: #0f7f81;
+  color: #117f87;
   font-size: 1.75rem;
   line-height: 1.1;
 }
@@ -348,7 +393,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: #0f8b8d;
-  box-shadow: 0 0 0 3px rgba(15, 139, 141, 0.14);
+  box-shadow: 0 0 0 3px rgba(17, 139, 147, 0.14);
 }
 
 .btn-primary,
@@ -359,12 +404,13 @@ textarea:focus {
 }
 
 .btn-primary {
-  background: #0f8b8d;
+  background: #117f87;
   color: #ffffff;
 }
 
 .btn-primary:hover {
-  background: #0b7274;
+  background: #0d6870;
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -374,8 +420,9 @@ textarea:focus {
 }
 
 .btn-secondary:hover {
-  background: #edf3ef;
-  border-color: #0f8b8d;
+  background: #eef7f8;
+  border-color: #117f87;
+  transform: translateY(-1px);
 }
 
 .btn-danger {
@@ -417,8 +464,8 @@ textarea:focus {
 
 .status-scheduled,
 .status-pending {
-  background: #e6f4f4;
-  color: #0b7274;
+  background: #e5f6f8;
+  color: #0d6870;
 }
 
 .status-completed,
