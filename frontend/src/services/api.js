@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:8080/api';
+const BASE_URL = '/api';
 
 async function request(endpoint, method = 'GET', body = null) {
   const options = {
@@ -43,12 +43,7 @@ export const athlete = {
     request('/athlete/sessions/today'),
   bookSession: (athleteId, therapistId, facilityId, sessionDate, durationMins, sessionType) =>
     request('/athlete/sessions/book', 'POST', {
-      athleteId,
-      therapistId,
-      facilityId,
-      sessionDate,
-      durationMins,
-      sessionType,
+      athleteId, therapistId, facilityId, sessionDate, durationMins, sessionType,
     }),
   getSessionHistory: (athleteId) =>
     request(`/athlete/${athleteId}/sessions/history`),
@@ -69,11 +64,7 @@ export const therapist = {
     request(`/therapist/${therapistId}/roster/today`),
   logBiomechanicalData: (sessionId, jumpPower, jointMobility, postureScore, notes) =>
     request('/therapist/biomechanics/log', 'POST', {
-      sessionId,
-      jumpPower,
-      jointMobility,
-      postureScore,
-      notes,
+      sessionId, jumpPower, jointMobility, postureScore, notes,
     }),
   getBiomechanicalsBySession: (sessionId) =>
     request(`/therapist/biomechanics/session/${sessionId}`),
@@ -88,12 +79,7 @@ export const therapist = {
 export const admin = {
   admitNewAthlete: (username, password, email, fullName, therapistId, facilityId) =>
     request('/admin/athletes/admit', 'POST', {
-      username,
-      password,
-      email,
-      fullName,
-      therapistId,
-      facilityId,
+      username, password, email, fullName, therapistId, facilityId,
     }),
   getAnalytics: () =>
     request('/admin/analytics'),

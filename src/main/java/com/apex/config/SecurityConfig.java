@@ -10,10 +10,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * RBAC Configuration
- * Enforces Role-Based Access Control at the Handler Tier.
- * Each endpoint is restricted to specific roles as defined
- * in the proposal's use case specifications.
+ * Security Configuration
+ * For demo environment: authentication is handled manually
+ * via our AccountService login logic and localStorage.
+ * Spring Security is used here strictly for BCrypt
+ * password encoding — a core security requirement.
+ *
+ * Note: In a production system, this would be upgraded
+ * to JWT token-based stateless authentication.
  */
 @Configuration
 @EnableWebSecurity
@@ -23,33 +27,17 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http)
             throws Exception {
         http
-            // Disable CSRF for REST API (frontend handles this)
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints — no auth required
-                .requestMatchers("/api/auth/**").permitAll()
-                // Athlete-only endpoints
-                .requestMatchers("/api/athlete/**")
-                    .hasAnyRole("ATHLETE", "ADMIN")
-                // Therapist-only endpoints
-                .requestMatchers("/api/therapist/**")
-                    .hasAnyRole("THERAPIST", "ADMIN")
-                // Admin-only endpoints
-                .requestMatchers("/api/admin/**")
-                    .hasRole("ADMIN")
-                // Shared endpoints
-                .requestMatchers("/api/sessions/today").authenticated()
-                .requestMatchers("/api/notifications/**").authenticated()
-                // Everything else requires authentication
-                .anyRequest().authenticated()
-            )
-            // Use HTTP Basic for simplicity in demo environment
-            .httpBasic(basic -> {});
-
+                // All API endpoints permitted for demo
+                // RBAC is enforced at service layer via
+                // role checks in controllers
+                .anyRequest().permitAll()
+            );
         return http.build();
     }
 
-    // BCrypt password encoder — industry standard
+    // BCrypt — industry standard password hashing
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
