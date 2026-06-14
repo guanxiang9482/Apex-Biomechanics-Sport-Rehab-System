@@ -200,12 +200,17 @@ function AthleteDashboard() {
   }[activeSection];
 
   return (
-    <div className="dashboard">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <h2>APEX</h2>
+    <div className="dashboard athlete-dashboard">
+      <header className="athlete-topbar">
+        <div className="athlete-brand">
+          <span>APEX</span>
+          <div>
+            <strong>Client Recovery</strong>
+            <small>Sessions & Performance</small>
+          </div>
         </div>
-        <nav className="sidebar-nav">
+
+        <nav className="athlete-nav" aria-label="Client sections">
           <button className={activeSection === 'overview' ? 'active' : ''} onClick={() => setActiveSection('overview')}>Overview</button>
           <button className={activeSection === 'sessions' ? 'active' : ''} onClick={() => setActiveSection('sessions')}>Sessions</button>
           <button className={activeSection === 'profile' ? 'active' : ''} onClick={() => setActiveSection('profile')}>Profile</button>
@@ -213,17 +218,25 @@ function AthleteDashboard() {
           <button className={activeSection === 'invoices' ? 'active' : ''} onClick={() => setActiveSection('invoices')}>Invoices</button>
           <button className={activeSection === 'notifications' ? 'active' : ''} onClick={() => setActiveSection('notifications')}>Notifications</button>
         </nav>
-        <button className="logout-btn" onClick={handleLogout}>Logout</button>
-      </aside>
 
-      <main className="main-content">
-        <header className="content-header">
+        <div className="athlete-topbar-actions">
+          <button className="btn-secondary" type="button" onClick={loadDashboard}>Refresh</button>
+          <button className="logout-btn athlete-logout" onClick={handleLogout}>Logout</button>
+        </div>
+      </header>
+
+      <main className="main-content athlete-main">
+        <header className="content-header athlete-hero">
           <div>
             <p className="eyebrow">Athlete Portal</p>
             <h1>{sectionTitle}</h1>
-            <p>Welcome, {user?.username}</p>
+            <p>Welcome, {user?.username}. Track sessions, recovery data, invoices, and clinic notifications.</p>
           </div>
-          <button className="btn-secondary" type="button" onClick={loadDashboard}>Refresh</button>
+          <div className="athlete-hero-panel" aria-label="Client quick summary">
+            <span>Recovery Hub</span>
+            <strong>{sectionTitle}</strong>
+            <small>Client Dashboard</small>
+          </div>
         </header>
 
         {message && <div className={`dashboard-message ${message.type}`}>{message.text}</div>}

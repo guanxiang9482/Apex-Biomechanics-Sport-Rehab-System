@@ -155,28 +155,41 @@ function TherapistDashboard() {
   }[activeSection];
 
   return (
-    <div className="dashboard">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <h2>APEX</h2>
+    <div className="dashboard therapist-dashboard">
+      <header className="therapist-topbar">
+        <div className="therapist-brand">
+          <span>APEX</span>
+          <div>
+            <strong>Therapist Workspace</strong>
+            <small>Movement Lab & Recovery</small>
+          </div>
         </div>
-        <nav className="sidebar-nav">
+
+        <nav className="therapist-nav" aria-label="Therapist sections">
           <button className={activeSection === 'roster' ? 'active' : ''} onClick={() => setActiveSection('roster')}>Roster</button>
           <button className={activeSection === 'biomechanics' ? 'active' : ''} onClick={() => setActiveSection('biomechanics')}>Biomechanics</button>
           <button className={activeSection === 'reports' ? 'active' : ''} onClick={() => setActiveSection('reports')}>Reports</button>
           <button className={activeSection === 'notifications' ? 'active' : ''} onClick={() => setActiveSection('notifications')}>Notifications</button>
         </nav>
-        <button className="logout-btn" onClick={handleLogout}>Logout</button>
-      </aside>
 
-      <main className="main-content">
-        <header className="content-header">
+        <div className="therapist-topbar-actions">
+          <button className="btn-secondary" type="button" onClick={loadDashboard}>Refresh</button>
+          <button className="logout-btn therapist-logout" onClick={handleLogout}>Logout</button>
+        </div>
+      </header>
+
+      <main className="main-content therapist-main">
+        <header className="content-header therapist-hero">
           <div>
             <p className="eyebrow">Therapist Portal</p>
             <h1>{sectionTitle}</h1>
-            <p>Welcome, {user?.username}</p>
+            <p>Welcome, {user?.username}. Review roster flow, capture movement metrics, and prepare clinical reports.</p>
           </div>
-          <button className="btn-secondary" type="button" onClick={loadDashboard}>Refresh</button>
+          <div className="therapist-hero-panel" aria-label="Therapist quick summary">
+            <span>Clinical Focus</span>
+            <strong>{sectionTitle}</strong>
+            <small>Session Workflow</small>
+          </div>
         </header>
 
         {message && <div className={`dashboard-message ${message.type}`}>{message.text}</div>}

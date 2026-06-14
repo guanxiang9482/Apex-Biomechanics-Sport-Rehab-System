@@ -196,12 +196,17 @@ function AdminDashboard() {
   }[activeSection];
 
   return (
-    <div className="dashboard">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <h2>APEX</h2>
+    <div className="dashboard admin-dashboard">
+      <header className="admin-topbar">
+        <div className="admin-brand">
+          <span>APEX</span>
+          <div>
+            <strong>Clinical Operations</strong>
+            <small>Biomechanics & Sports Rehab</small>
+          </div>
         </div>
-        <nav className="sidebar-nav">
+
+        <nav className="admin-nav" aria-label="Admin sections">
           <button className={activeSection === 'overview' ? 'active' : ''} onClick={() => setActiveSection('overview')}>Overview</button>
           <button className={activeSection === 'admission' ? 'active' : ''} onClick={() => setActiveSection('admission')}>Admission</button>
           <button className={activeSection === 'analytics' ? 'active' : ''} onClick={() => setActiveSection('analytics')}>Analytics</button>
@@ -210,17 +215,25 @@ function AdminDashboard() {
           <button className={activeSection === 'facilities' ? 'active' : ''} onClick={() => setActiveSection('facilities')}>Facilities</button>
           <button className={activeSection === 'notifications' ? 'active' : ''} onClick={() => setActiveSection('notifications')}>Notifications</button>
         </nav>
-        <button className="logout-btn" onClick={handleLogout}>Logout</button>
-      </aside>
 
-      <main className="main-content">
-        <header className="content-header">
+        <div className="admin-topbar-actions">
+          <button className="btn-secondary" type="button" onClick={loadDashboard}>Refresh</button>
+          <button className="logout-btn admin-logout" onClick={handleLogout}>Logout</button>
+        </div>
+      </header>
+
+      <main className="main-content admin-main">
+        <header className="content-header admin-hero">
           <div>
             <p className="eyebrow">Administrator Portal</p>
             <h1>{sectionTitle}</h1>
-            <p>Welcome, {user?.username}</p>
+            <p>Welcome, {user?.username}. Manage admissions, billing, staff access, and clinic operations.</p>
           </div>
-          <button className="btn-secondary" type="button" onClick={loadDashboard}>Refresh</button>
+          <div className="admin-hero-panel" aria-label="Admin quick summary">
+            <span>Active Module</span>
+            <strong>{sectionTitle}</strong>
+            <small>Operations Console</small>
+          </div>
         </header>
 
         {message && <div className={`dashboard-message ${message.type}`}>{message.text}</div>}
@@ -291,7 +304,7 @@ function AdminDashboard() {
                 <input name="password" type="password" value={admissionForm.password} onChange={updateAdmission} required />
               </label>
               <label>
-                Therapist ID
+                Assigned Therapist ID
                 <input name="therapistId" type="number" min="1" value={admissionForm.therapistId} onChange={updateAdmission} required />
               </label>
               <label>

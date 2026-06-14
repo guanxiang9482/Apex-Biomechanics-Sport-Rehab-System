@@ -69,7 +69,7 @@ function LoginPage() {
       );
       setForm(emptyForm);
       setActiveTab('login');
-      showMessage('success', 'Registration successful. You can now sign in.');
+      showMessage('success', 'Client registration successful. You can now sign in.');
     } catch (error) {
       showMessage('error', error.message);
     } finally {
@@ -122,7 +122,7 @@ function LoginPage() {
 
           <div className="form-tabs" role="tablist" aria-label="Authentication mode">
             <button className={`tab ${activeTab === 'login' ? 'active' : ''}`} type="button" onClick={() => switchTab('login')}>Login</button>
-            <button className={`tab ${activeTab === 'register' ? 'active' : ''}`} type="button" onClick={() => switchTab('register')}>Register</button>
+            <button className={`tab ${activeTab === 'register' ? 'active' : ''}`} type="button" onClick={() => switchTab('register')}>Client Register</button>
             <button className={`tab ${activeTab === 'reset' ? 'active' : ''}`} type="button" onClick={() => switchTab('reset')}>Reset</button>
           </div>
 
@@ -142,7 +142,7 @@ function LoginPage() {
               <input name="email" type="email" placeholder="Email" value={form.email} onChange={updateForm} required />
               <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
               <input name="password" type="password" placeholder="Password" value={form.password} onChange={updateForm} required />
-              <button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create Account'}</button>
+              <button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create Client Account'}</button>
             </form>
           )}
 
