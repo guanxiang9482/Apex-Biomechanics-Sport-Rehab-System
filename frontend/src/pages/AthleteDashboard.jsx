@@ -7,6 +7,7 @@ import './Dashboard.css';
 const initialBooking = {
   therapistId: '',
   facilityId: '1',
+  sessionDay: '',
   sessionDate: '',
   durationMins: 60,
   sessionType: 'Rehab Assessment',
@@ -14,11 +15,10 @@ const initialBooking = {
 
 const initialProfile = {
   fullName: '',
-  phone: '',
   injuryStatus: '',
+  sport: '',
   bodyWeightKg: '',
   heightCm: '',
-  postureNotes: '',
 };
 
 function AthleteDashboard() {
@@ -32,6 +32,11 @@ function AthleteDashboard() {
   const [sessionHistory, setSessionHistory] = useState([]);
   const [metrics, setMetrics] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [athleteProfile, setAthleteProfile] = useState(null);
+  const [therapists, setTherapists] = useState([]);
+  const [facilities, setFacilities] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [noticeList, setNoticeList] = useState([]);
   const [profileForm, setProfileForm] = useState(initialProfile);
   const [bookingForm, setBookingForm] = useState(initialBooking);
@@ -45,38 +50,43 @@ function AthleteDashboard() {
     setMessage(null);
 
     try {
-      const [
-        today,
-        upcoming,
-        history,
-        recoveryMetrics,
-        athleteInvoices,
-        userNotifications,
-        profile,
-      ] = await Promise.all([
-        athlete.getTodaySessions(),
-        athlete.getUpcomingSessions(user.userId),
-        athlete.getSessionHistory(user.userId),
-        athlete.getRecoveryMetrics(user.userId),
-        athlete.getInvoices(user.userId),
+      const [profile, therapistData, facilityData, userNotifications] = await Promise.all([
+        athlete.getProfileByUserId(user.userId),
+        athlete.getTherapists(),
+        athlete.getFacilities(),
         notifications.getAll(user.userId),
-        athlete.getProfile(user.userId),
       ]);
 
-      setTodaySessions(today);
+      const athleteId = profile.athleteId;
+      const [today, upcoming, history, recoveryMetrics, athleteInvoices] = await Promise.all([
+        athlete.getTodaySessions(),
+        athlete.getUpcomingSessions(athleteId),
+        athlete.getSessionHistory(athleteId),
+        athlete.getRecoveryMetrics(athleteId),
+        athlete.getInvoices(athleteId),
+      ]);
+
+      setAthleteProfile(profile);
+      setTherapists(therapistData);
+      setFacilities(facilityData);
+      setTodaySessions(today.filter((session) => session.athleteId === athleteId));
       setUpcomingSessions(upcoming);
       setSessionHistory(history);
       setMetrics(recoveryMetrics);
       setInvoices(athleteInvoices);
       setNoticeList(userNotifications);
       setProfileForm({
-        fullName: profile.fullName || '',
-        phone: profile.phone || '',
+        fullName: profile.fullName || profile.fullname || '',
         injuryStatus: profile.injuryStatus || '',
+        sport: profile.sport || '',
         bodyWeightKg: profile.bodyWeightKg || '',
         heightCm: profile.heightCm || '',
-        postureNotes: profile.postureNotes || '',
       });
+      setBookingForm((current) => ({
+        ...current,
+        therapistId: current.therapistId || String(therapistData[0]?.therapistId || ''),
+        facilityId: current.facilityId || String(facilityData[0]?.facilityId || '1'),
+      }));
     } catch (error) {
       showMessage('error', error.message);
     } finally {
@@ -105,7 +115,13 @@ function AthleteDashboard() {
 
   const updateBooking = (event) => {
     const { name, value } = event.target;
-    setBookingForm((current) => ({ ...current, [name]: value }));
+    setBookingForm((current) => ({
+      ...current,
+      [name]: value,
+      sessionDate: ['therapistId', 'facilityId', 'sessionDay', 'durationMins'].includes(name)
+        ? ''
+        : current.sessionDate,
+    }));
   };
 
   const updateProfile = (event) => {
@@ -113,11 +129,48 @@ function AthleteDashboard() {
     setProfileForm((current) => ({ ...current, [name]: value }));
   };
 
+  const loadAvailableSlots = useCallback(async () => {
+    if (!bookingForm.therapistId || !bookingForm.facilityId || !bookingForm.sessionDay) {
+      setAvailableSlots([]);
+      return;
+    }
+
+    setAvailabilityLoading(true);
+    try {
+      const result = await athlete.getAvailableSlots(
+        Number(bookingForm.therapistId),
+        Number(bookingForm.facilityId),
+        bookingForm.sessionDay,
+        Number(bookingForm.durationMins),
+      );
+      const slots = result.availableSlots || [];
+      setAvailableSlots(slots);
+      setBookingForm((current) => ({
+        ...current,
+        sessionDate: slots.includes(current.sessionDate) ? current.sessionDate : (slots[0] || ''),
+      }));
+    } catch (error) {
+      setAvailableSlots([]);
+      showMessage('error', error.message);
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  }, [bookingForm.durationMins, bookingForm.facilityId, bookingForm.sessionDay, bookingForm.therapistId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(loadAvailableSlots, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadAvailableSlots]);
+
   const handleBookSession = async (event) => {
     event.preventDefault();
+    if (!athleteProfile?.athleteId) {
+      showMessage('error', 'Athlete profile is still loading. Please try again.');
+      return;
+    }
     try {
       await athlete.bookSession(
-        user.userId,
+        athleteProfile.athleteId,
         Number(bookingForm.therapistId),
         Number(bookingForm.facilityId),
         bookingForm.sessionDate,
@@ -156,19 +209,22 @@ function AthleteDashboard() {
 
   const handleProfileSubmit = async (event) => {
     event.preventDefault();
+    if (!athleteProfile?.athleteId) {
+      showMessage('error', 'Athlete profile is still loading. Please try again.');
+      return;
+    }
 
     const payload = {
       fullName: profileForm.fullName,
-      phone: profileForm.phone,
       injuryStatus: profileForm.injuryStatus,
-      postureNotes: profileForm.postureNotes,
+      sport: profileForm.sport,
     };
 
     if (profileForm.bodyWeightKg) payload.bodyWeightKg = Number(profileForm.bodyWeightKg);
     if (profileForm.heightCm) payload.heightCm = Number(profileForm.heightCm);
 
     try {
-      await athlete.updateProfile(user.userId, payload);
+      await athlete.updateProfile(athleteProfile.athleteId, payload);
       showMessage('success', 'Profile updated successfully.');
       await loadDashboard();
     } catch (error) {
@@ -188,7 +244,7 @@ function AthleteDashboard() {
   const unreadCount = noticeList.filter((item) => item.is_read === false || item.is_read === 0).length;
   const paidTotal = invoices
     .filter((invoice) => invoice.status === 'PAID')
-    .reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0);
+    .reduce((sum, invoice) => sum + Number(invoice.finalAmount ?? invoice.amount ?? 0), 0);
 
   const sectionTitle = {
     overview: 'Athlete Overview',
@@ -272,7 +328,7 @@ function AthleteDashboard() {
                 <div className="panel-header">
                   <h2>Today&apos;s Sessions</h2>
                 </div>
-                <SessionCards sessions={todaySessions} onCancel={handleCancelSession} compact />
+                <SessionCards sessions={todaySessions} therapists={therapists} facilities={facilities} onCancel={handleCancelSession} compact />
               </div>
               <div className="panel">
                 <div className="panel-header">
@@ -297,31 +353,52 @@ function AthleteDashboard() {
               </div>
               <form className="form-grid" onSubmit={handleBookSession}>
                 <label>
-                  Therapist ID
-                  <input name="therapistId" type="number" min="1" value={bookingForm.therapistId} onChange={updateBooking} required />
+                  Therapist
+                  <select name="therapistId" value={bookingForm.therapistId} onChange={updateBooking} required>
+                    <option value="">Choose therapist</option>
+                    {therapists.map((therapistItem) => (
+                      <option value={therapistItem.therapistId} key={therapistItem.therapistId}>
+                        {therapistItem.fullname || therapistItem.username} - {therapistItem.specialization || 'Physiotherapist'}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label>
-                  Facility ID
+                  Facility
                   <select name="facilityId" value={bookingForm.facilityId} onChange={updateBooking}>
-                    <option value="1">1 - Gait Analysis Lab A</option>
-                    <option value="2">2 - Strength Assessment Room</option>
-                    <option value="3">3 - Recovery Pool</option>
+                    {facilities.map((facility) => (
+                      <option value={facility.facilityId} key={facility.facilityId}>
+                        {facility.name} - {facility.location || facility.type}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label>
                   Session Date
-                  <input name="sessionDate" type="datetime-local" value={bookingForm.sessionDate} onChange={updateBooking} required />
+                  <input name="sessionDay" type="date" value={bookingForm.sessionDay} onChange={updateBooking} required />
                 </label>
                 <label>
                   Duration
                   <input name="durationMins" type="number" min="15" step="15" value={bookingForm.durationMins} onChange={updateBooking} required />
                 </label>
+                <label>
+                  Available Time
+                  <select name="sessionDate" value={bookingForm.sessionDate} onChange={updateBooking} required>
+                    <option value="">{availabilityLoading ? 'Checking times...' : 'Choose time'}</option>
+                    {availableSlots.map((slot) => (
+                      <option value={slot} key={slot}>{formatDateTime(slot)}</option>
+                    ))}
+                  </select>
+                </label>
                 <label className="full-width">
                   Session Type
                   <input name="sessionType" value={bookingForm.sessionType} onChange={updateBooking} required />
                 </label>
-                <button className="btn-primary compact" type="submit">Book Session</button>
+                <button className="btn-primary compact" type="submit" disabled={!bookingForm.sessionDate}>Book Session</button>
               </form>
+              {bookingForm.sessionDay && !availabilityLoading && availableSlots.length === 0 && (
+                <p className="empty-state">No available times for this therapist and facility. Try another date or room.</p>
+              )}
             </div>
 
             <div className="content-split">
@@ -330,7 +407,7 @@ function AthleteDashboard() {
                   <h2>Upcoming Sessions</h2>
                   <span>{upcomingSessions.length}</span>
                 </div>
-                <SessionCards sessions={upcomingSessions} onCancel={handleCancelSession} onPickReschedule={(sessionId) => setReschedule((current) => ({ ...current, sessionId: String(sessionId) }))} />
+                <SessionCards sessions={upcomingSessions} therapists={therapists} facilities={facilities} onCancel={handleCancelSession} onPickReschedule={(sessionId) => setReschedule((current) => ({ ...current, sessionId: String(sessionId) }))} />
               </div>
               <div className="panel">
                 <div className="panel-header">
@@ -356,7 +433,7 @@ function AthleteDashboard() {
                 <h2>Session History</h2>
                 <span>UC8</span>
               </div>
-              <SessionTable sessions={sessionHistory} />
+              <SessionTable sessions={sessionHistory} therapists={therapists} />
             </div>
           </section>
         )}
@@ -366,15 +443,15 @@ function AthleteDashboard() {
             <form className="panel form-grid" onSubmit={handleProfileSubmit}>
               <label>
                 Full Name
-                <input name="fullName" value={profileForm.fullName} onChange={updateProfile} required />
-              </label>
-              <label>
-                Phone
-                <input name="phone" value={profileForm.phone} onChange={updateProfile} />
+                <input name="fullName" value={profileForm.fullName} readOnly />
               </label>
               <label>
                 Injury Status
                 <input name="injuryStatus" value={profileForm.injuryStatus} onChange={updateProfile} />
+              </label>
+              <label>
+                Sport
+                <input name="sport" value={profileForm.sport} onChange={updateProfile} />
               </label>
               <label>
                 Body Weight (kg)
@@ -383,10 +460,6 @@ function AthleteDashboard() {
               <label>
                 Height (cm)
                 <input name="heightCm" type="number" min="1" step="0.1" value={profileForm.heightCm} onChange={updateProfile} />
-              </label>
-              <label className="full-width">
-                Posture Notes
-                <textarea name="postureNotes" rows="5" value={profileForm.postureNotes} onChange={updateProfile} />
               </label>
               <button className="btn-primary compact" type="submit">Update Profile</button>
             </form>
@@ -404,7 +477,7 @@ function AthleteDashboard() {
                     <div><span>Jump Power</span><strong>{record.jumpPower}</strong></div>
                     <div><span>Joint Mobility</span><strong>{record.jointMobility}</strong></div>
                     <div><span>Posture Score</span><strong>{record.postureScore}</strong></div>
-                    <p>{record.notes || 'No notes recorded.'}</p>
+                    <p>{record.treatmentNote || record.notes || 'No notes recorded.'}</p>
                     <small>{formatDateTime(record.recordedAt)}</small>
                   </article>
                 ))}
@@ -446,7 +519,7 @@ function AthleteDashboard() {
   );
 }
 
-function SessionCards({ sessions, onCancel, onPickReschedule, compact = false }) {
+function SessionCards({ sessions, therapists = [], facilities = [], onCancel, onPickReschedule, compact = false }) {
   if (sessions.length === 0) {
     return <p className="empty-state">No sessions found.</p>;
   }
@@ -460,7 +533,7 @@ function SessionCards({ sessions, onCancel, onPickReschedule, compact = false })
             <span className={statusClass(session.status)}>{session.status}</span>
           </div>
           <p>{formatDateTime(session.sessionDate)}</p>
-          <p>Therapist #{session.therapistId || 'Unassigned'} · Facility #{session.facilityId || '-'}</p>
+          <p>{getTherapistLabel(therapists, session.therapistId)} - {getFacilityLabel(facilities, session.facilityId)}</p>
           <p>{session.durationMins} minutes</p>
           <div className="card-actions">
             {onPickReschedule && <button className="btn-secondary" type="button" onClick={() => onPickReschedule(session.sessionId)}>Reschedule</button>}
@@ -472,7 +545,7 @@ function SessionCards({ sessions, onCancel, onPickReschedule, compact = false })
   );
 }
 
-function SessionTable({ sessions }) {
+function SessionTable({ sessions, therapists = [] }) {
   if (sessions.length === 0) {
     return <p className="empty-state">No previous session records found.</p>;
   }
@@ -495,7 +568,7 @@ function SessionTable({ sessions }) {
               <td>#{session.sessionId}</td>
               <td>{formatDateTime(session.sessionDate)}</td>
               <td>{session.sessionType || 'Session'}</td>
-              <td>#{session.therapistId || '-'}</td>
+              <td>{getTherapistLabel(therapists, session.therapistId)}</td>
               <td><span className={statusClass(session.status)}>{session.status}</span></td>
             </tr>
           ))}
@@ -529,7 +602,7 @@ function InvoiceTable({ invoices }) {
               <td>#{invoice.invoiceId}</td>
               <td>#{invoice.sessionId}</td>
               <td>{invoice.billingType}</td>
-              <td>{formatCurrency(invoice.amount)}</td>
+              <td>{formatCurrency(invoice.finalAmount ?? invoice.amount)}</td>
               <td><span className={statusClass(invoice.status)}>{invoice.status}</span></td>
               <td>{formatDateTime(invoice.createdAt)}</td>
             </tr>
@@ -538,6 +611,16 @@ function InvoiceTable({ invoices }) {
       </table>
     </div>
   );
+}
+
+function getTherapistLabel(therapists, therapistId) {
+  const therapistItem = therapists.find((item) => item.therapistId === therapistId);
+  return therapistItem ? (therapistItem.fullname || therapistItem.username) : `Therapist #${therapistId || '-'}`;
+}
+
+function getFacilityLabel(facilities, facilityId) {
+  const facility = facilities.find((item) => item.facilityId === facilityId);
+  return facility ? facility.name : `Facility #${facilityId || '-'}`;
 }
 
 export default AthleteDashboard;

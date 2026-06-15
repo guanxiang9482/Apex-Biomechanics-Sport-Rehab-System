@@ -98,26 +98,81 @@ function LoginPage() {
     }
   };
 
+  const tabTitle = {
+    login: 'Welcome back',
+    register: 'Create client access',
+    reset: 'Reset password',
+  }[activeTab];
+
+  const tabSubtitle = {
+    login: 'Enter your assigned APEX account to continue.',
+    register: 'Client registration is for athletes only.',
+    reset: 'Use your username and registered email.',
+  }[activeTab];
+
   return (
     <main className="login-page">
+      <div className="login-backdrop" aria-hidden="true">
+        <span className="motion-line line-a" />
+        <span className="motion-line line-b" />
+        <span className="motion-line line-c" />
+      </div>
+
       <section className="login-shell">
+        <div className="auth-orbit" aria-hidden="true">
+          <span>Force plate sync</span>
+          <strong>Live</strong>
+        </div>
+
         <div className="login-visual" aria-hidden="true">
           <img src={rehabHero} alt="" />
           <div className="visual-overlay">
-            <span>Biomechanics Lab</span>
-            <h2>Track recovery, sessions, and performance in one clinical workspace.</h2>
-            <div className="visual-stats">
-              <strong>3</strong>
-              <span>Role-based portals</span>
+            <div className="visual-kicker">
+              <span>Biomechanics Lab</span>
+              <small>Live Recovery Desk</small>
+            </div>
+            <h2>Precision rehab access for sessions, movement data, and clinical follow up.</h2>
+
+            <div className="visual-metric-board">
+              <article>
+                <span>Gait</span>
+                <strong>92%</strong>
+              </article>
+              <article>
+                <span>Mobility</span>
+                <strong>74</strong>
+              </article>
+              <article>
+                <span>Load</span>
+                <strong>48kg</strong>
+              </article>
+            </div>
+
+            <div className="visual-session-card">
+              <div>
+                <span>Next session</span>
+                <strong>Movement Screen</strong>
+              </div>
+              <small>09:00</small>
             </div>
           </div>
         </div>
 
         <div className="login-container" aria-label="Apex authentication">
+          <div className="access-status" aria-hidden="true">
+            <span>Clinic Access</span>
+            <strong>Secure Portal</strong>
+          </div>
+
           <div className="login-brand">
             <span>Sports Rehabilitation Portal</span>
             <h1>APEX</h1>
             <p className="subtitle">Biomechanics & Sports Rehab System</p>
+            <div className="role-strip" aria-label="Supported account roles">
+              <span>Admin</span>
+              <span>Therapist</span>
+              <span>Client</span>
+            </div>
           </div>
 
           <div className="form-tabs" role="tablist" aria-label="Authentication mode">
@@ -126,31 +181,63 @@ function LoginPage() {
             <button className={`tab ${activeTab === 'reset' ? 'active' : ''}`} type="button" onClick={() => switchTab('reset')}>Reset</button>
           </div>
 
+          <div className="auth-heading">
+            <h2>{tabTitle}</h2>
+            <p>{tabSubtitle}</p>
+          </div>
+
           {message && <p className={`message ${message.type}`}>{message.text}</p>}
 
           {activeTab === 'login' && (
             <form onSubmit={handleLogin}>
-              <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
-              <input name="password" type="password" placeholder="Password" value={form.password} onChange={updateForm} required />
+              <label>
+                Username
+                <input name="username" type="text" placeholder="admin" value={form.username} onChange={updateForm} required />
+              </label>
+              <label>
+                Password
+                <input name="password" type="password" placeholder="Enter password" value={form.password} onChange={updateForm} required />
+              </label>
               <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign In'}</button>
             </form>
           )}
 
           {activeTab === 'register' && (
             <form onSubmit={handleRegister}>
-              <input name="fullName" type="text" placeholder="Full name" value={form.fullName} onChange={updateForm} required />
-              <input name="email" type="email" placeholder="Email" value={form.email} onChange={updateForm} required />
-              <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
-              <input name="password" type="password" placeholder="Password" value={form.password} onChange={updateForm} required />
+              <label>
+                Full name
+                <input name="fullName" type="text" placeholder="Client full name" value={form.fullName} onChange={updateForm} required />
+              </label>
+              <label>
+                Email
+                <input name="email" type="email" placeholder="client@email.com" value={form.email} onChange={updateForm} required />
+              </label>
+              <label>
+                Username
+                <input name="username" type="text" placeholder="Choose username" value={form.username} onChange={updateForm} required />
+              </label>
+              <label>
+                Password
+                <input name="password" type="password" placeholder="Create password" value={form.password} onChange={updateForm} required />
+              </label>
               <button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create Client Account'}</button>
             </form>
           )}
 
           {activeTab === 'reset' && (
             <form onSubmit={handleResetPassword}>
-              <input name="username" type="text" placeholder="Username" value={form.username} onChange={updateForm} required />
-              <input name="email" type="email" placeholder="Registered email" value={form.email} onChange={updateForm} required />
-              <input name="newPassword" type="password" placeholder="New password" value={form.newPassword} onChange={updateForm} required />
+              <label>
+                Username
+                <input name="username" type="text" placeholder="Your username" value={form.username} onChange={updateForm} required />
+              </label>
+              <label>
+                Registered email
+                <input name="email" type="email" placeholder="account@email.com" value={form.email} onChange={updateForm} required />
+              </label>
+              <label>
+                New password
+                <input name="newPassword" type="password" placeholder="Enter new password" value={form.newPassword} onChange={updateForm} required />
+              </label>
               <button type="submit" disabled={loading}>{loading ? 'Updating...' : 'Update Password'}</button>
             </form>
           )}

@@ -27,7 +27,7 @@ const initialStaff = {
   role: 'THERAPIST',
 };
 
-const facilities = [
+const fallbackFacilities = [
   { id: 1, name: 'Gait Analysis Lab A', type: 'Biomechanics', status: 'Available' },
   { id: 2, name: 'Strength Assessment Room', type: 'Performance', status: 'Available' },
   { id: 3, name: 'Recovery Pool', type: 'Hydrotherapy', status: 'Available' },
@@ -42,6 +42,8 @@ function AdminDashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [athletes, setAthletes] = useState([]);
   const [ledger, setLedger] = useState([]);
+  const [facilities, setFacilities] = useState(fallbackFacilities);
+  const [therapists, setTherapists] = useState([]);
   const [noticeList, setNoticeList] = useState([]);
   const [admissionForm, setAdmissionForm] = useState(initialAdmission);
   const [billingForm, setBillingForm] = useState(initialBilling);
@@ -57,16 +59,25 @@ function AdminDashboard() {
     setMessage(null);
 
     try {
-      const [analyticsData, athleteData, ledgerData, userNotifications] = await Promise.all([
+      const [analyticsData, athleteData, ledgerData, facilityData, therapistData, userNotifications] = await Promise.all([
         admin.getAnalytics(),
         admin.getAllAthletes(),
         admin.getFullLedger(),
+        admin.getFacilities(),
+        admin.getTherapists(),
         notifications.getAll(user.userId),
       ]);
 
       setAnalytics(analyticsData);
       setAthletes(athleteData);
       setLedger(ledgerData);
+      setFacilities(facilityData.length > 0 ? facilityData : fallbackFacilities);
+      setTherapists(therapistData);
+      setAdmissionForm((current) => ({
+        ...current,
+        therapistId: current.therapistId || String(therapistData[0]?.therapistId || ''),
+        facilityId: current.facilityId || String(facilityData[0]?.facilityId || fallbackFacilities[0].id),
+      }));
       setNoticeList(userNotifications);
     } catch (error) {
       showMessage('error', error.message);
@@ -121,7 +132,7 @@ function AdminDashboard() {
         Number(admissionForm.facilityId),
       );
       setAdmissionForm(initialAdmission);
-      showMessage('success', `${result.fullName} admitted successfully. Athlete ID: ${result.athleteId}`);
+      showMessage('success', `${result.fullname || result.fullName} admitted successfully. Athlete ID: ${result.athleteId}`);
       await loadDashboard();
     } catch (error) {
       showMessage('error', error.message);
@@ -183,7 +194,7 @@ function AdminDashboard() {
 
   const paidRevenue = ledger
     .filter((invoice) => invoice.status === 'PAID')
-    .reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0);
+    .reduce((sum, invoice) => sum + Number(invoice.finalAmount ?? invoice.amount ?? 0), 0);
 
   const sectionTitle = {
     overview: 'Admin Overview',
@@ -304,14 +315,23 @@ function AdminDashboard() {
                 <input name="password" type="password" value={admissionForm.password} onChange={updateAdmission} required />
               </label>
               <label>
-                Assigned Therapist ID
-                <input name="therapistId" type="number" min="1" value={admissionForm.therapistId} onChange={updateAdmission} required />
+                Assigned Therapist
+                <select name="therapistId" value={admissionForm.therapistId} onChange={updateAdmission} required>
+                  <option value="">Choose therapist</option>
+                  {therapists.map((therapistItem) => (
+                    <option value={therapistItem.therapistId} key={therapistItem.therapistId}>
+                      {therapistItem.fullname || therapistItem.username} - {therapistItem.specialization || 'Physiotherapist'}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Facility
                 <select name="facilityId" value={admissionForm.facilityId} onChange={updateAdmission}>
                   {facilities.map((facility) => (
-                    <option value={facility.id} key={facility.id}>{facility.id} - {facility.name}</option>
+                    <option value={facility.facilityId ?? facility.id} key={facility.facilityId ?? facility.id}>
+                      {facility.name} - {facility.location || facility.type}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -398,7 +418,7 @@ function AdminDashboard() {
               <div className="panel result-panel">
                 <h2>Billing Result</h2>
                 <p>Invoice #{billingResult.invoiceId} created with {billingResult.strategy}.</p>
-                <strong>{formatCurrency(billingResult.amount)}</strong>
+                <strong>{formatCurrency(billingResult.finalAmount)}</strong>
               </div>
             )}
 
@@ -457,13 +477,14 @@ function AdminDashboard() {
               </div>
               <div className="card-grid">
                 {facilities.map((facility) => (
-                  <article className="card" key={facility.id}>
+                  <article className="card" key={facility.facilityId ?? facility.id}>
                     <div className="card-topline">
                       <h3>{facility.name}</h3>
                       <span className="status-badge status-completed">{facility.status}</span>
                     </div>
-                    <p>Facility #{facility.id}</p>
+                    <p>Facility #{facility.facilityId ?? facility.id}</p>
                     <p>{facility.type}</p>
+                    {facility.location && <p>{facility.location}</p>}
                     <p>Used by admission and booking forms.</p>
                   </article>
                 ))}
@@ -525,7 +546,7 @@ function LedgerTable({ ledger }) {
               <td>#{invoice.sessionId}</td>
               <td>#{invoice.athleteId}</td>
               <td>{invoice.billingType}</td>
-              <td>{formatCurrency(invoice.amount)}</td>
+              <td>{formatCurrency(invoice.finalAmount ?? invoice.amount)}</td>
               <td><span className={statusClass(invoice.status)}>{invoice.status}</span></td>
               <td>{formatDateTime(invoice.createdAt)}</td>
             </tr>

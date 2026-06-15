@@ -120,7 +120,7 @@ CREATE TABLE `equipments` (
   PRIMARY KEY (`item_id`),
   KEY `facility_id` (`facility_id`),
   CONSTRAINT `equipments_ibfk_1` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`facility_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -140,7 +140,7 @@ CREATE TABLE `facilities` (
   PRIMARY KEY (`facility_id`),
   KEY `last_used_by_therapist` (`last_used_by_therapist`),
   CONSTRAINT `facilities_ibfk_1` FOREIGN KEY (`last_used_by_therapist`) REFERENCES `physiotherapists` (`therapist_id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -277,8 +277,7 @@ CREATE TABLE `users` (
   `contact` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `username` (`username`),
-  UNIQUE KEY `email` (`email`),
-  UNIQUE KEY `UC_password` (`password`)
+  UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

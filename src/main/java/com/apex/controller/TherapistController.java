@@ -4,6 +4,7 @@ import com.apex.domain.*;
 import com.apex.repository.interfaces.BiomechanicsRepository;
 import com.apex.repository.interfaces.ClinicalReportRepository;
 import com.apex.repository.interfaces.MedicalRecordRepository;
+import com.apex.repository.interfaces.PhysiotherapistRepository;
 import com.apex.service.SessionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,16 +24,27 @@ public class TherapistController {
     private final BiomechanicsRepository biomechanicsRepository;
     private final MedicalRecordRepository medicalRecordRepository;
     private final ClinicalReportRepository clinicalReportRepository;
+    private final PhysiotherapistRepository physiotherapistRepository;
 
     public TherapistController(
             SessionService sessionService,
             BiomechanicsRepository biomechanicsRepository,
             MedicalRecordRepository medicalRecordRepository,
-            ClinicalReportRepository clinicalReportRepository) {
+            ClinicalReportRepository clinicalReportRepository,
+            PhysiotherapistRepository physiotherapistRepository) {
         this.sessionService           = sessionService;
         this.biomechanicsRepository   = biomechanicsRepository;
         this.medicalRecordRepository  = medicalRecordRepository;
         this.clinicalReportRepository = clinicalReportRepository;
+        this.physiotherapistRepository = physiotherapistRepository;
+    }
+
+    @GetMapping("/user/{userId}/profile")
+    public ResponseEntity<?> getProfileByUserId(
+            @PathVariable int userId) {
+        return physiotherapistRepository.findByUserId(userId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     // UC11 — Today's roster

@@ -5,6 +5,7 @@ import { formatDateTime, statusClass } from '../utils/format';
 import './Dashboard.css';
 
 const initialMetricForm = {
+  athleteId: '',
   sessionId: '',
   jumpPower: '',
   jointMobility: '',
@@ -13,8 +14,8 @@ const initialMetricForm = {
 };
 
 const initialReportForm = {
-  athleteId: '',
-  summary: '',
+  reportType: 'Progress Review',
+  description: '',
 };
 
 function TherapistDashboard() {
@@ -26,10 +27,10 @@ function TherapistDashboard() {
   const [roster, setRoster] = useState([]);
   const [records, setRecords] = useState([]);
   const [reports, setReports] = useState([]);
+  const [therapistProfile, setTherapistProfile] = useState(null);
   const [noticeList, setNoticeList] = useState([]);
   const [metricForm, setMetricForm] = useState(initialMetricForm);
   const [recordLookupId, setRecordLookupId] = useState('');
-  const [reportLookupId, setReportLookupId] = useState('');
   const [reportForm, setReportForm] = useState(initialReportForm);
 
   const showMessage = (type, text) => setMessage({ type, text });
@@ -40,10 +41,12 @@ function TherapistDashboard() {
     setMessage(null);
 
     try {
+      const profile = await therapist.getProfileByUserId(user.userId);
       const [todayRoster, userNotifications] = await Promise.all([
-        therapist.getTodayRoster(user.userId),
+        therapist.getTodayRoster(profile.therapistId),
         notifications.getAll(user.userId),
       ]);
+      setTherapistProfile(profile);
       setRoster(todayRoster);
       setNoticeList(userNotifications);
     } catch (error) {
@@ -94,8 +97,14 @@ function TherapistDashboard() {
 
   const handleMetricSubmit = async (event) => {
     event.preventDefault();
+    if (!therapistProfile?.therapistId) {
+      showMessage('error', 'Therapist profile is still loading. Please try again.');
+      return;
+    }
     try {
       await therapist.logBiomechanicalData(
+        Number(metricForm.athleteId),
+        therapistProfile.therapistId,
         Number(metricForm.sessionId),
         Number(metricForm.jumpPower),
         Number(metricForm.jointMobility),
@@ -120,8 +129,12 @@ function TherapistDashboard() {
 
   const handleReportSubmit = async (event) => {
     event.preventDefault();
+    if (!therapistProfile?.therapistId) {
+      showMessage('error', 'Therapist profile is still loading. Please try again.');
+      return;
+    }
     try {
-      await therapist.generateReport(Number(reportForm.athleteId), user.userId, reportForm.summary);
+      await therapist.generateReport(therapistProfile.therapistId, reportForm.reportType, reportForm.description);
       setReportForm(initialReportForm);
       showMessage('success', 'Clinical report generated successfully.');
     } catch (error) {
@@ -131,8 +144,12 @@ function TherapistDashboard() {
 
   const handleReportLookup = async (event) => {
     event.preventDefault();
+    if (!therapistProfile?.therapistId) {
+      showMessage('error', 'Therapist profile is still loading. Please try again.');
+      return;
+    }
     try {
-      setReports(await therapist.getAthleteReports(Number(reportLookupId)));
+      setReports(await therapist.getTherapistReports(therapistProfile.therapistId));
     } catch (error) {
       showMessage('error', error.message);
     }
@@ -244,6 +261,10 @@ function TherapistDashboard() {
           <section className="section section-stack">
             <form className="panel form-grid" onSubmit={handleMetricSubmit}>
               <label>
+                Athlete ID
+                <input name="athleteId" type="number" min="1" value={metricForm.athleteId} onChange={updateMetricForm} required />
+              </label>
+              <label>
                 Session ID
                 <input name="sessionId" type="number" min="1" value={metricForm.sessionId} onChange={updateMetricForm} required />
               </label>
@@ -284,7 +305,7 @@ function TherapistDashboard() {
                       <div><span>Jump Power</span><strong>{record.jumpPower}</strong></div>
                       <div><span>Joint Mobility</span><strong>{record.jointMobility}</strong></div>
                       <div><span>Posture Score</span><strong>{record.postureScore}</strong></div>
-                      <p>{record.notes || 'No notes recorded.'}</p>
+                      <p>{record.treatmentNote || record.notes || 'No notes recorded.'}</p>
                       <small>{formatDateTime(record.recordedAt)}</small>
                     </article>
                   ))}
@@ -298,12 +319,12 @@ function TherapistDashboard() {
           <section className="section section-stack">
             <form className="panel form-grid single-column" onSubmit={handleReportSubmit}>
               <label>
-                Athlete ID
-                <input name="athleteId" type="number" min="1" value={reportForm.athleteId} onChange={updateReportForm} required />
+                Report Type
+                <input name="reportType" value={reportForm.reportType} onChange={updateReportForm} required />
               </label>
               <label>
-                Report Summary
-                <textarea name="summary" rows="6" value={reportForm.summary} onChange={updateReportForm} required />
+                Description
+                <textarea name="description" rows="6" value={reportForm.description} onChange={updateReportForm} required />
               </label>
               <button className="btn-primary compact" type="submit">Generate Report</button>
             </form>
@@ -314,8 +335,7 @@ function TherapistDashboard() {
                 <span>UC14</span>
               </div>
               <form className="form-inline" onSubmit={handleReportLookup}>
-                <input type="number" min="1" placeholder="Athlete ID" value={reportLookupId} onChange={(event) => setReportLookupId(event.target.value)} required />
-                <button className="btn-secondary" type="submit">Load Reports</button>
+                <button className="btn-secondary" type="submit">Load My Reports</button>
               </form>
               {reports.length === 0 ? (
                 <p className="empty-state">No report data loaded.</p>
@@ -327,8 +347,9 @@ function TherapistDashboard() {
                         <h3>Report #{report.reportId}</h3>
                         <span className={statusClass(report.status)}>{report.status}</span>
                       </div>
-                      <p>{report.summary}</p>
-                      <small>{formatDateTime(report.reportDate)}</small>
+                      <p>{report.reportType}</p>
+                      <p>{report.description}</p>
+                      <small>{formatDateTime(report.submittedAt)}</small>
                     </article>
                   ))}
                 </div>

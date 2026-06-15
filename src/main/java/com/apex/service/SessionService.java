@@ -2,14 +2,18 @@ package com.apex.service;
 
 import com.apex.domain.Session;
 import com.apex.domain.SessionStatus;
+import com.apex.domain.FacilityStatus;
+import com.apex.repository.interfaces.FacilityRepository;
 import com.apex.repository.interfaces.SessionRepository;
 import com.apex.service.observer.NotificationEngine;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 /**
  * SRP: Responsible for rehab session
@@ -22,11 +26,14 @@ public class SessionService {
 
     private final SessionRepository sessionRepository;
     private final NotificationEngine notificationEngine;
+    private final FacilityRepository facilityRepository;
 
     public SessionService(SessionRepository sessionRepository,
-                          NotificationEngine notificationEngine) {
+                          NotificationEngine notificationEngine,
+                          FacilityRepository facilityRepository) {
         this.sessionRepository  = sessionRepository;
         this.notificationEngine = notificationEngine;
+        this.facilityRepository = facilityRepository;
     }
 
     // UC7 — Book Rehab Session
@@ -35,6 +42,9 @@ public class SessionService {
                                LocalDateTime scheduledDate,
                                int durationMins,
                                String sessionType) {
+        ensureSlotCanBeBooked(therapistId, facilityId,
+                scheduledDate, durationMins, null);
+
         Session session = new Session(athleteId, therapistId,
                 facilityId, scheduledDate, durationMins, sessionType);
         sessionRepository.save(session);
@@ -72,6 +82,8 @@ public class SessionService {
     public void rescheduleSession(int sessionId,
                                   LocalDateTime newDate) {
         sessionRepository.findById(sessionId).ifPresent(s -> {
+            ensureSlotCanBeBooked(s.getTherapistId(), s.getFacilityId(),
+                    newDate, s.getDurationMins(), sessionId);
             s.setSessionDate(newDate);
             sessionRepository.updateSession(s);
             notificationEngine.notifyAllObservers(
@@ -121,6 +133,21 @@ public class SessionService {
         return sessionRepository.findById(sessionId);
     }
 
+    public List<LocalDateTime> getAvailableSlots(int therapistId,
+                                                 int facilityId,
+                                                 LocalDate date,
+                                                 int durationMins) {
+        validateFacility(facilityId);
+
+        return IntStream.rangeClosed(9, 16)
+                .mapToObj(hour -> LocalDateTime.of(date,
+                        LocalTime.of(hour, 0)))
+                .filter(slot -> slot.isAfter(LocalDateTime.now()))
+                .filter(slot -> !hasBookingConflict(therapistId,
+                        facilityId, slot, durationMins, null))
+                .toList();
+    }
+
     public void cancelInitialSession(int athleteId) {
         sessionRepository.findUpcomingByAthleteId(athleteId)
                 .stream()
@@ -128,5 +155,50 @@ public class SessionService {
                         .equals(s.getSessionType()))
                 .findFirst()
                 .ifPresent(s -> cancelSession(s.getSessionId()));
+    }
+
+    private void ensureSlotCanBeBooked(int therapistId, int facilityId,
+                                       LocalDateTime start,
+                                       int durationMins,
+                                       Integer currentSessionId) {
+        validateFacility(facilityId);
+        if (hasBookingConflict(therapistId, facilityId, start,
+                durationMins, currentSessionId)) {
+            throw new IllegalArgumentException(
+                    "Selected therapist or facility is not available at this time.");
+        }
+    }
+
+    private void validateFacility(int facilityId) {
+        var facility = facilityRepository.findById(facilityId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Facility not found."));
+        if (facility.getStatus() != FacilityStatus.AVAILABLE) {
+            throw new IllegalArgumentException(
+                    "Selected facility is not available.");
+        }
+    }
+
+    private boolean hasBookingConflict(int therapistId, int facilityId,
+                                       LocalDateTime start,
+                                       int durationMins,
+                                       Integer currentSessionId) {
+        LocalDateTime end = start.plusMinutes(durationMins);
+
+        return sessionRepository.findByDate(start.toLocalDate())
+                .stream()
+                .filter(session -> currentSessionId == null
+                        || session.getSessionId() != currentSessionId)
+                .filter(session -> session.getStatus()
+                        != SessionStatus.CANCELLED)
+                .filter(session -> session.getTherapistId() == therapistId
+                        || session.getFacilityId() == facilityId)
+                .anyMatch(session -> {
+                    LocalDateTime existingStart = session.getSessionDate();
+                    LocalDateTime existingEnd = existingStart.plusMinutes(
+                            session.getDurationMins());
+                    return start.isBefore(existingEnd)
+                            && existingStart.isBefore(end);
+                });
     }
 }

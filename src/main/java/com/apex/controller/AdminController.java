@@ -3,6 +3,7 @@ package com.apex.controller;
 import com.apex.domain.*;
 import com.apex.repository.interfaces.ClinicalReportRepository;
 import com.apex.repository.interfaces.FacilityRepository;
+import com.apex.repository.interfaces.PhysiotherapistRepository;
 import com.apex.service.AccountService;
 import com.apex.service.PaymentService;
 import com.apex.service.ProfileService;
@@ -27,6 +28,7 @@ public class AdminController {
     private final AccountService accountService;
     private final FacilityRepository facilityRepository;
     private final ClinicalReportRepository clinicalReportRepository;
+    private final PhysiotherapistRepository physiotherapistRepository;
 
     public AdminController(
             AdmissionFacade admissionFacade,
@@ -34,13 +36,15 @@ public class AdminController {
             PaymentService paymentService,
             AccountService accountService,
             FacilityRepository facilityRepository,
-            ClinicalReportRepository clinicalReportRepository) {
+            ClinicalReportRepository clinicalReportRepository,
+            PhysiotherapistRepository physiotherapistRepository) {
         this.admissionFacade          = admissionFacade;
         this.profileService           = profileService;
         this.paymentService           = paymentService;
         this.accountService           = accountService;
         this.facilityRepository       = facilityRepository;
         this.clinicalReportRepository = clinicalReportRepository;
+        this.physiotherapistRepository = physiotherapistRepository;
     }
 
     // UC15 — Admit New Athlete (Facade Pattern showcase)
@@ -106,6 +110,12 @@ public class AdminController {
     public ResponseEntity<List<Facility>> getFacilities() {
         return ResponseEntity.ok(
                 facilityRepository.findAll());
+    }
+
+    @GetMapping("/therapists")
+    public ResponseEntity<List<Physiotherapist>> getTherapists() {
+        return ResponseEntity.ok(
+                physiotherapistRepository.findAll());
     }
 
     // UC18 — Process billing (Strategy Pattern showcase)
