@@ -4,40 +4,38 @@ import java.time.LocalDateTime;
 
 public class NotificationLog {
 
-    private int notificationId;
+    private int notifId;
     private int recipientId;
-    private String eventMessage;
+    private String message;
     private boolean isRead;
-    private LocalDateTime createdAt;
+    private LocalDateTime timestamp;
 
     // Constructor for new notification
-    public NotificationLog(int recipientId, String eventMessage) {
-        this.recipientId  = recipientId;
-        this.eventMessage = eventMessage;
-        this.isRead       = false;
-        this.createdAt    = LocalDateTime.now();
+    public NotificationLog(int recipientId, String message) {
+        this.recipientId = recipientId;
+        this.message     = message;
+        this.isRead      = false;
+        this.timestamp   = LocalDateTime.now();
     }
 
     // Constructor for loading from database
-    public NotificationLog(int notificationId, int recipientId,
-                           String eventMessage, boolean isRead,
-                           LocalDateTime createdAt) {
-        this.notificationId = notificationId;
-        this.recipientId    = recipientId;
-        this.eventMessage   = eventMessage;
-        this.isRead         = isRead;
-        this.createdAt      = createdAt;
+    public NotificationLog(int notifId, int recipientId,
+                           String message, boolean isRead,
+                           LocalDateTime timestamp) {
+        this.notifId     = notifId;
+        this.recipientId = recipientId;
+        this.message     = message;
+        this.isRead      = isRead;
+        this.timestamp   = timestamp;
     }
 
     public void markAsRead() { this.isRead = true; }
 
-    // Getters
-    public int getNotificationId()        { return notificationId; }
-    public int getRecipientId()           { return recipientId; }
-    public String getEventMessage()       { return eventMessage; }
-    public boolean isRead()               { return isRead; }
-    public LocalDateTime getCreatedAt()   { return createdAt; }
+    public int getNotifId()             { return notifId; }
+    public int getRecipientId()         { return recipientId; }
+    public String getMessage()          { return message; }
+    public boolean isRead()             { return isRead; }
+    public LocalDateTime getTimestamp() { return timestamp; }
 
-    // Setters
-    public void setNotificationId(int id) { this.notificationId = id; }
+    public void setNotifId(int id)      { this.notifId = id; }
 }

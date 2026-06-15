@@ -1,10 +1,11 @@
 package com.apex.repository.interfaces;
 
-import com.apex.domain.Session;
-import com.apex.domain.SessionStatus;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+
+import com.apex.domain.Session;
+import com.apex.domain.SessionStatus;
 
 // ISP: Only scheduling operations
 public interface SessionRepository {

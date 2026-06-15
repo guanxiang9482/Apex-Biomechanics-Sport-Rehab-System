@@ -5,22 +5,23 @@ import org.springframework.stereotype.Component;
 
 /**
  * Concrete Strategy 2 — Insurance Billing
- * Applies a discounted coverage rate for athletes
- * with third-party medical insurance.
- * Rate: $0.30 per minute
+ * 40% discount for insured athletes.
+ * Rate: RM 2.00 per minute, 40% covered by insurance.
  */
 @Component("insuranceBilling")
 public class InsuranceBilling implements BillingStrategy {
 
-    private static final double INSURANCE_RATE_PER_MINUTE = 0.30;
+    private static final double RATE_PER_MINUTE = 2.00;
+    private static final double DISCOUNT         = 0.40;
 
     @Override
     public double calculateFees(Session session) {
-        return session.getDurationMins() * INSURANCE_RATE_PER_MINUTE;
+        return session.getDurationMins() * RATE_PER_MINUTE;
     }
 
     @Override
-    public String getStrategyName() {
-        return "Insurance Billing";
-    }
+    public double getDiscountRate() { return DISCOUNT; }
+
+    @Override
+    public String getStrategyName() { return "Insurance Billing"; }
 }

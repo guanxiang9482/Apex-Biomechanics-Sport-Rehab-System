@@ -12,9 +12,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * SRP: Responsible for rehab session scheduling logic.
- * Handles UC5, UC7, UC9, UC11, UC13.
- * Triggers Observer notifications on state changes.
+ * SRP: Responsible for rehab session
+ * scheduling and lifecycle management.
+ * UC5, UC7, UC9, UC11, UC13
+ * Triggers Observer on every state change.
  */
 @Service
 public class SessionService {
@@ -30,79 +31,75 @@ public class SessionService {
 
     // UC7 — Book Rehab Session
     public Session bookSession(int athleteId, int therapistId,
-                               int facilityId, LocalDateTime sessionDate,
-                               int durationMins, String sessionType) {
+                               int facilityId,
+                               LocalDateTime scheduledDate,
+                               int durationMins,
+                               String sessionType) {
         Session session = new Session(athleteId, therapistId,
-                facilityId, sessionDate, durationMins, sessionType);
+                facilityId, scheduledDate, durationMins, sessionType);
         sessionRepository.save(session);
 
-        // UC21 — Trigger Observer notification
+        // UC21 — Observer notification
         notificationEngine.notifyAllObservers(
-                "New session booked for Athlete ID:" + athleteId +
-                " on " + sessionDate);
+                "New session booked for Athlete #" + athleteId +
+                " on " + scheduledDate);
         return session;
     }
 
-    // Used by Facade for initial evaluation session (UC15)
+    // Used by Facade for initial evaluation (UC15)
     public Session scheduleInitialSession(int athleteId,
                                           int therapistId,
                                           int facilityId) {
-        LocalDateTime initialDate = LocalDateTime.now().plusDays(1)
-                .withHour(9).withMinute(0);
+        LocalDateTime initial = LocalDateTime.now()
+                .plusDays(1).withHour(9).withMinute(0)
+                .withSecond(0).withNano(0);
         return bookSession(athleteId, therapistId, facilityId,
-                initialDate, 60, "Initial Evaluation");
+                initial, 60, "Initial Evaluation");
     }
 
     // UC9 — Cancel Session
     public void cancelSession(int sessionId) {
-        Optional<Session> sessionOpt =
-                sessionRepository.findById(sessionId);
-        sessionOpt.ifPresent(session -> {
-            session.updateStatus(SessionStatus.CANCELLED);
+        sessionRepository.findById(sessionId).ifPresent(s -> {
+            s.updateStatus(SessionStatus.CANCELLED);
             sessionRepository.updateStatus(sessionId,
                     SessionStatus.CANCELLED);
-            // UC21 — Observer notification
             notificationEngine.notifyAllObservers(
-                    "Session ID:" + sessionId + " has been CANCELLED.");
+                    "Session #" + sessionId + " has been CANCELLED.");
         });
     }
 
     // UC9 — Reschedule Session
     public void rescheduleSession(int sessionId,
                                   LocalDateTime newDate) {
-        Optional<Session> sessionOpt =
-                sessionRepository.findById(sessionId);
-        sessionOpt.ifPresent(session -> {
-            session.setSessionDate(newDate);
-            sessionRepository.updateSession(session);
-            // UC21 — Observer notification
+        sessionRepository.findById(sessionId).ifPresent(s -> {
+            s.setSessionDate(newDate);
+            sessionRepository.updateSession(s);
             notificationEngine.notifyAllObservers(
-                    "Session ID:" + sessionId +
+                    "Session #" + sessionId +
                     " rescheduled to " + newDate);
         });
     }
 
     // UC13 — Update Session Status
-    public void updateStatus(int sessionId, SessionStatus newStatus) {
-        Optional<Session> sessionOpt =
-                sessionRepository.findById(sessionId);
-        sessionOpt.ifPresent(session -> {
-            session.updateStatus(newStatus);
+    public void updateStatus(int sessionId,
+                             SessionStatus newStatus) {
+        sessionRepository.findById(sessionId).ifPresent(s -> {
+            s.updateStatus(newStatus);
             sessionRepository.updateStatus(sessionId, newStatus);
-            // UC21 — Observer notification
             notificationEngine.notifyAllObservers(
-                    "Session ID:" + sessionId +
+                    "Session #" + sessionId +
                     " status updated to " + newStatus.name());
         });
     }
 
-    // UC5 — View Today's Sessions
+    // UC5 — Today's sessions
     public List<Session> getTodaySessions() {
         return sessionRepository.findByDate(LocalDate.now());
     }
 
-    // UC11 — View Daily Roster by Therapist
-    public List<Session> getTodayRosterForTherapist(int therapistId) {
+    // UC11 — Therapist daily roster
+    public List<Session> getTodayRosterForTherapist(
+            int therapistId) {
         return sessionRepository.findByTherapistId(therapistId)
                 .stream()
                 .filter(s -> s.getSessionDate().toLocalDate()
@@ -110,12 +107,12 @@ public class SessionService {
                 .toList();
     }
 
-    // UC8 — View Session History
+    // UC8 — Session history
     public List<Session> getSessionHistory(int athleteId) {
         return sessionRepository.findByAthleteId(athleteId);
     }
 
-    // UC9 — View upcoming sessions
+    // UC9 — Upcoming sessions
     public List<Session> getUpcomingSessions(int athleteId) {
         return sessionRepository.findUpcomingByAthleteId(athleteId);
     }
@@ -127,8 +124,8 @@ public class SessionService {
     public void cancelInitialSession(int athleteId) {
         sessionRepository.findUpcomingByAthleteId(athleteId)
                 .stream()
-                .filter(s -> s.getSessionType()
-                        .equals("Initial Evaluation"))
+                .filter(s -> "Initial Evaluation"
+                        .equals(s.getSessionType()))
                 .findFirst()
                 .ifPresent(s -> cancelSession(s.getSessionId()));
     }

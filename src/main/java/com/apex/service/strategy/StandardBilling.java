@@ -5,14 +5,13 @@ import org.springframework.stereotype.Component;
 
 /**
  * Concrete Strategy 1 — Standard Billing
- * Calculates fees based on session duration
- * multiplied by the base clinic rate.
- * Rate: $0.50 per minute
+ * Full rate, no discount.
+ * Rate: RM 2.00 per minute
  */
 @Component("standardBilling")
 public class StandardBilling implements BillingStrategy {
 
-    private static final double RATE_PER_MINUTE = 0.50;
+    private static final double RATE_PER_MINUTE = 2.00;
 
     @Override
     public double calculateFees(Session session) {
@@ -20,7 +19,8 @@ public class StandardBilling implements BillingStrategy {
     }
 
     @Override
-    public String getStrategyName() {
-        return "Standard Billing";
-    }
+    public double getDiscountRate() { return 0.0; }
+
+    @Override
+    public String getStrategyName() { return "Standard Billing"; }
 }

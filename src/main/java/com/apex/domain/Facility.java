@@ -3,36 +3,47 @@ package com.apex.domain;
 public class Facility {
 
     private int facilityId;
-    private String facilityName;
-    private String facilityType;
-    private boolean isAvailable;
-    private String notes;
+    private Integer lastUsedByTherapist;
+    private String name;
+    private String type;
+    private FacilityStatus status;
+    private String location;
 
-    public Facility(String facilityName, String facilityType) {
-        this.facilityName = facilityName;
-        this.facilityType = facilityType;
-        this.isAvailable  = true;
+    // Constructor for new facility creation
+    public Facility(String name, String type, String location) {
+        this.name     = name;
+        this.type     = type;
+        this.location = location;
+        this.status   = FacilityStatus.AVAILABLE;
     }
 
-    public Facility(int facilityId, String facilityName,
-                    String facilityType, boolean isAvailable,
-                    String notes) {
-        this.facilityId   = facilityId;
-        this.facilityName = facilityName;
-        this.facilityType = facilityType;
-        this.isAvailable  = isAvailable;
-        this.notes        = notes;
+    // Constructor for loading from database
+    public Facility(int facilityId, Integer lastUsedByTherapist,
+                    String name, String type,
+                    FacilityStatus status, String location) {
+        this.facilityId            = facilityId;
+        this.lastUsedByTherapist   = lastUsedByTherapist;
+        this.name                  = name;
+        this.type                  = type;
+        this.status                = status;
+        this.location              = location;
     }
 
-    public int getFacilityId()      { return facilityId; }
-    public String getFacilityName() { return facilityName; }
-    public String getFacilityType() { return facilityType; }
-    public boolean isAvailable()    { return isAvailable; }
-    public String getNotes()        { return notes; }
+    // Getters
+    public int getFacilityId()              { return facilityId; }
+    public Integer getLastUsedByTherapist() { return lastUsedByTherapist; }
+    public String getName()                 { return name; }
+    public String getType()                 { return type; }
+    public FacilityStatus getStatus()       { return status; }
+    public String getLocation()             { return location; }
 
-    public void setFacilityId(int facilityId)       { this.facilityId = facilityId; }
-    public void setAvailable(boolean available)      { this.isAvailable = available; }
-    public void setNotes(String notes)               { this.notes = notes; }
-    public void setFacilityName(String facilityName) { this.facilityName = facilityName; }
-    public void setFacilityType(String facilityType) { this.facilityType = facilityType; }
+    // Setters
+    public void setFacilityId(int id)       { this.facilityId = id; }
+    public void setStatus(FacilityStatus s) { this.status = s; }
+    public void setLastUsedByTherapist(Integer id) {
+        this.lastUsedByTherapist = id;
+    }
+    public void setLocation(String location){ this.location = location; }
+    public void setName(String name)        { this.name = name; }
+    public void setType(String type)        { this.type = type; }
 }

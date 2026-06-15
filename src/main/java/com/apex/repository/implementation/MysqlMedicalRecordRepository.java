@@ -1,24 +1,19 @@
 package com.apex.repository.implementation;
 
-import com.apex.domain.ClinicalReport;
-import com.apex.domain.ReportStatus;
-import com.apex.domain.Session;
-import com.apex.domain.SessionStatus;
+import com.apex.domain.MedicalRecord;
 import com.apex.repository.interfaces.MedicalRecordRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public class MysqlMedicalRecordRepository implements MedicalRecordRepository {
+public class MysqlMedicalRecordRepository
+        implements MedicalRecordRepository {
 
     private final JdbcTemplate jdbc;
 
@@ -26,97 +21,73 @@ public class MysqlMedicalRecordRepository implements MedicalRecordRepository {
         this.jdbc = jdbc;
     }
 
-    private ClinicalReport mapRowToReport(ResultSet rs, int rowNum)
+    private MedicalRecord mapRow(ResultSet rs, int rowNum)
             throws SQLException {
-        return new ClinicalReport(
-                rs.getInt("report_id"),
+        return new MedicalRecord(
+                rs.getInt("record_id"),
                 rs.getInt("athlete_id"),
-                rs.getInt("therapist_id"),
-                rs.getTimestamp("report_date").toLocalDateTime(),
-                rs.getString("summary"),
-                ReportStatus.valueOf(rs.getString("status"))
-        );
-    }
-
-    private Session mapRowToSession(ResultSet rs, int rowNum)
-            throws SQLException {
-        return new Session(
-                rs.getInt("session_id"),
-                rs.getInt("athlete_id"),
-                rs.getInt("therapist_id"),
-                rs.getInt("facility_id"),
-                rs.getTimestamp("session_date").toLocalDateTime(),
-                rs.getInt("duration_mins"),
-                rs.getString("session_type"),
-                SessionStatus.valueOf(rs.getString("status")),
-                rs.getString("notes"),
-                rs.getTimestamp("created_at").toLocalDateTime()
+                rs.getInt("created_by_therapist"),
+                rs.getTimestamp("created_at").toLocalDateTime(),
+                rs.getString("diagnosis_notes"),
+                rs.getTimestamp("updated_at").toLocalDateTime()
         );
     }
 
     @Override
-    public void saveReport(ClinicalReport report) {
-        String sql = "INSERT INTO clinical_reports " +
-                     "(athlete_id, therapist_id, summary, status) " +
-                     "VALUES (?, ?, ?, ?)";
+    public void save(MedicalRecord record) {
+        String sql = "INSERT INTO medical_records " +
+                "(athlete_id, created_by_therapist, diagnosis_notes) " +
+                "VALUES (?, ?, ?)";
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbc.update(conn -> {
             PreparedStatement ps = conn.prepareStatement(
                     sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setInt(1, report.getAthleteId());
-            ps.setInt(2, report.getTherapistId());
-            ps.setString(3, report.getSummary());
-            ps.setString(4, report.getStatus().name());
+            ps.setInt(1, record.getAthleteId());
+            ps.setInt(2, record.getCreatedByTherapist());
+            ps.setString(3, record.getDiagnosisNotes());
             return ps;
         }, keyHolder);
         if (keyHolder.getKey() != null) {
-            report.setReportId(keyHolder.getKey().intValue());
+            record.setRecordId(keyHolder.getKey().intValue());
         }
     }
 
     @Override
-    public Optional<ClinicalReport> findReportById(int reportId) {
-        String sql = "SELECT * FROM clinical_reports WHERE report_id = ?";
-        var results = jdbc.query(sql, this::mapRowToReport, reportId);
+    public Optional<MedicalRecord> findById(int recordId) {
+        String sql = "SELECT * FROM medical_records " +
+                "WHERE record_id = ?";
+        var results = jdbc.query(sql, this::mapRow, recordId);
         return results.isEmpty() ? Optional.empty()
-                                 : Optional.of(results.get(0));
+                : Optional.of(results.get(0));
     }
 
     @Override
-    public List<ClinicalReport> findReportsByAthleteId(int athleteId) {
-        String sql = "SELECT * FROM clinical_reports " +
-                     "WHERE athlete_id = ? ORDER BY report_date DESC";
-        return jdbc.query(sql, this::mapRowToReport, athleteId);
+    public List<MedicalRecord> findByAthleteId(int athleteId) {
+        String sql = "SELECT * FROM medical_records " +
+                "WHERE athlete_id = ? ORDER BY created_at DESC";
+        return jdbc.query(sql, this::mapRow, athleteId);
     }
 
     @Override
-    public List<ClinicalReport> findReportsByTherapistId(int therapistId) {
-        String sql = "SELECT * FROM clinical_reports " +
-                     "WHERE therapist_id = ? ORDER BY report_date DESC";
-        return jdbc.query(sql, this::mapRowToReport, therapistId);
+    public List<MedicalRecord> findByTherapistId(int therapistId) {
+        String sql = "SELECT * FROM medical_records " +
+                "WHERE created_by_therapist = ? " +
+                "ORDER BY created_at DESC";
+        return jdbc.query(sql, this::mapRow, therapistId);
     }
 
     @Override
-    public void updateReport(ClinicalReport report) {
-        String sql = "UPDATE clinical_reports SET summary = ?, " +
-                     "status = ? WHERE report_id = ?";
-        jdbc.update(sql,
-                report.getSummary(),
-                report.getStatus().name(),
-                report.getReportId());
+    public void update(MedicalRecord record) {
+        String sql = "UPDATE medical_records SET " +
+                "diagnosis_notes = ?, updated_at = NOW() " +
+                "WHERE record_id = ?";
+        jdbc.update(sql, record.getDiagnosisNotes(),
+                record.getRecordId());
     }
 
     @Override
-    public void deleteReport(int reportId) {
-        String sql = "DELETE FROM clinical_reports WHERE report_id = ?";
-        jdbc.update(sql, reportId);
-    }
-
-    @Override
-    public List<Session> getSessionHistory(int athleteId) {
-        String sql = "SELECT * FROM sessions WHERE athlete_id = ? " +
-                     "AND status = 'COMPLETED' " +
-                     "ORDER BY session_date DESC";
-        return jdbc.query(sql, this::mapRowToSession, athleteId);
+    public void delete(int recordId) {
+        jdbc.update("DELETE FROM medical_records " +
+                "WHERE record_id = ?", recordId);
     }
 }

@@ -4,10 +4,7 @@ import com.apex.domain.*;
 import com.apex.repository.interfaces.InvoiceRepository;
 import com.apex.repository.interfaces.SessionRepository;
 import com.apex.service.observer.NotificationEngine;
-import com.apex.service.strategy.BillingStrategy;
-import com.apex.service.strategy.InsuranceBilling;
-import com.apex.service.strategy.SponsorshipBilling;
-import com.apex.service.strategy.StandardBilling;
+import com.apex.service.strategy.*;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,10 +12,16 @@ import java.util.Optional;
 
 /**
  * Strategy Pattern — Context Class
- * Holds a reference to the active BillingStrategy.
- * Delegates fee calculation entirely to the strategy,
- * never performing math itself (SRP + OCP adherence).
- * Handles UC18 (Process Session Billing), UC20 (View Ledger).
+ * Delegates fee calculation to the active BillingStrategy.
+ * Never performs math itself — SRP + OCP adherence.
+ *
+ * Strategy alignment with Invoice fields:
+ * Standard:    baseRate * duration, discountRate = 0.0
+ * Insurance:   baseRate * duration, discountRate = 0.40
+ * Sponsorship: baseRate * duration, discountRate = 1.0
+ *
+ * UC18: Process Session Billing
+ * UC20: View Financial Ledger
  */
 @Service
 public class PaymentService {
@@ -28,14 +31,13 @@ public class PaymentService {
     private final SessionRepository sessionRepository;
     private final NotificationEngine notificationEngine;
 
-    // Default strategy is Standard Billing
     public PaymentService(InvoiceRepository invoiceRepository,
                           SessionRepository sessionRepository,
                           NotificationEngine notificationEngine) {
-        this.invoiceRepository   = invoiceRepository;
-        this.sessionRepository   = sessionRepository;
-        this.notificationEngine  = notificationEngine;
-        this.strategy            = new StandardBilling();
+        this.invoiceRepository  = invoiceRepository;
+        this.sessionRepository  = sessionRepository;
+        this.notificationEngine = notificationEngine;
+        this.strategy           = new StandardBilling();
     }
 
     // Runtime strategy swap — OCP in action
@@ -43,7 +45,6 @@ public class PaymentService {
         this.strategy = strategy;
     }
 
-    // Select strategy from billing type string
     public void selectStrategy(BillingType billingType) {
         this.strategy = switch (billingType) {
             case STANDARD    -> new StandardBilling();
@@ -58,35 +59,36 @@ public class PaymentService {
                                          BillingType billingType) {
         Optional<Session> sessionOpt =
                 sessionRepository.findById(sessionId);
-        if (sessionOpt.isEmpty()) {
+        if (sessionOpt.isEmpty())
             throw new IllegalArgumentException(
                     "Session not found: " + sessionId);
-        }
 
         Session session = sessionOpt.get();
         selectStrategy(billingType);
 
-        // Delegate calculation to active strategy
-        double amount = strategy.calculateFees(session);
+        // Delegate to strategy — context never calculates
+        double baseAmount   = strategy.calculateFees(session);
+        double discountRate = strategy.getDiscountRate();
 
-        Invoice invoice = new Invoice(sessionId, athleteId,
-                billingType, amount);
+        Invoice invoice = new Invoice(athleteId, sessionId,
+                baseAmount, discountRate, billingType);
         invoiceRepository.save(invoice);
 
-        // UC21 — Notify athlete of billing
+        // UC21 — Notify athlete of invoice
         notificationEngine.notifyObserver(athleteId,
-                "Invoice generated: $" + String.format("%.2f", amount) +
+                "Invoice generated: RM" +
+                String.format("%.2f", invoice.getFinalAmount()) +
                 " (" + strategy.getStrategyName() + ")");
 
         return invoice;
     }
 
-    // UC20 — View Financial Ledger (Admin)
+    // UC20 — Full ledger (Admin)
     public List<Invoice> getFullLedger() {
         return invoiceRepository.getLedger();
     }
 
-    // UC20 — View own billing history (Athlete)
+    // UC20 — Athlete's own invoices
     public List<Invoice> getAthleteInvoices(int athleteId) {
         return invoiceRepository.findByAthleteId(athleteId);
     }

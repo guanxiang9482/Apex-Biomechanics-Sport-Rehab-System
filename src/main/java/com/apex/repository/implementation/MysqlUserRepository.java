@@ -1,14 +1,19 @@
 package com.apex.repository.implementation;
 
-import com.apex.domain.*;
-import com.apex.repository.interfaces.UserRepository;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.stereotype.Repository;
-
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.Optional;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import com.apex.domain.Administrator;
+import com.apex.domain.Athlete;
+import com.apex.domain.Physiotherapist;
+import com.apex.domain.Role;
+import com.apex.domain.User;
+import com.apex.repository.interfaces.UserRepository;
 
 @Repository
 public class MysqlUserRepository implements UserRepository {
@@ -19,57 +24,68 @@ public class MysqlUserRepository implements UserRepository {
         this.jdbc = jdbc;
     }
 
-    // RowMapper — maps ResultSet rows to User objects
-    private User mapRowToUser(ResultSet rs, int rowNum) throws SQLException {
+    private User mapRow(ResultSet rs, int rowNum) throws SQLException {
+        int userId        = rs.getInt("user_id");
+        String username   = rs.getString("username");
+        String password   = rs.getString("password");
+        String email      = rs.getString("email");
+        String fullname   = rs.getString("fullname");
+        String contact    = rs.getString("contact");
+        boolean isActive  = rs.getBoolean("is_active");
+        LocalDateTime lastLogin = rs.getTimestamp("last_login_at") != null
+                ? rs.getTimestamp("last_login_at").toLocalDateTime()
+                : null;
+        LocalDateTime createdAt = rs.getTimestamp("created_at") != null
+                ? rs.getTimestamp("created_at").toLocalDateTime()
+                : null;
         Role role = Role.valueOf(rs.getString("role"));
-        int userId = rs.getInt("user_id");
-        String username = rs.getString("username");
-        String passwordHash = rs.getString("password_hash");
-        String email = rs.getString("email");
-        boolean isActive = rs.getBoolean("is_active");
-        var lastActive = rs.getTimestamp("last_active") != null
-                ? rs.getTimestamp("last_active").toLocalDateTime() : null;
-        var createdAt = rs.getTimestamp("created_at").toLocalDateTime();
 
+        // Match YOUR constructor parameter order exactly
         return switch (role) {
-            case ATHLETE -> new Athlete(userId, username, passwordHash,
-                    email, isActive, lastActive, createdAt,
-                    "", null, "", "None", 0, 0, "");
-            case THERAPIST -> new Physiotherapist(userId, username, passwordHash,
-                    email, isActive, lastActive, createdAt,
-                    "", "", "", "");
-            case ADMIN -> new Administrator(userId, username, passwordHash,
-                    email, isActive, lastActive, createdAt,
-                    "", "", "");
+            case ATHLETE -> new Athlete(
+                    userId, username, password, email,
+                    fullname, contact, isActive,
+                    lastLogin, createdAt,
+                    null, "None", 0, 0, "", 0);
+            case THERAPIST -> new Physiotherapist(
+                    userId, username, password, email,
+                    isActive, lastLogin, createdAt,
+                    fullname, "", contact, "", 0);
+            case ADMIN -> new Administrator(
+                    userId, username, password, email,
+                    isActive, lastLogin, createdAt,
+                    fullname, contact, "", 0);
         };
     }
 
     @Override
     public void save(User user) {
         String sql = "INSERT INTO users " +
-                     "(username, password_hash, email, role) " +
-                     "VALUES (?, ?, ?, ?)";
+                "(username, password, email, role, fullname, contact) " +
+                "VALUES (?, ?, ?, ?, ?, ?)";
         jdbc.update(sql,
                 user.getUsername(),
-                user.getPasswordHash(),
+                user.getPassword(),
                 user.getEmail(),
-                user.getRole().name());
+                user.getRole().name(),
+                user.getFullname(),
+                user.getContact());
     }
 
     @Override
     public Optional<User> findByUsername(String username) {
         String sql = "SELECT * FROM users WHERE username = ?";
-        var results = jdbc.query(sql, this::mapRowToUser, username);
+        var results = jdbc.query(sql, this::mapRow, username);
         return results.isEmpty() ? Optional.empty()
-                                 : Optional.of(results.get(0));
+                : Optional.of(results.get(0));
     }
 
     @Override
     public Optional<User> findById(int userId) {
         String sql = "SELECT * FROM users WHERE user_id = ?";
-        var results = jdbc.query(sql, this::mapRowToUser, userId);
+        var results = jdbc.query(sql, this::mapRow, userId);
         return results.isEmpty() ? Optional.empty()
-                                 : Optional.of(results.get(0));
+                : Optional.of(results.get(0));
     }
 
     @Override
@@ -87,28 +103,25 @@ public class MysqlUserRepository implements UserRepository {
     }
 
     @Override
-    public void updatePassword(int userId, String newPasswordHash) {
-        String sql = "UPDATE users SET password_hash = ? " +
-                     "WHERE user_id = ?";
-        jdbc.update(sql, newPasswordHash, userId);
+    public void updatePassword(int userId, String newPassword) {
+        jdbc.update("UPDATE users SET password = ? WHERE user_id = ?",
+                newPassword, userId);
     }
 
     @Override
-    public void updateLastActive(int userId) {
-        String sql = "UPDATE users SET last_active = NOW() " +
-                     "WHERE user_id = ?";
-        jdbc.update(sql, userId);
+    public void updateLastLoginAt(int userId) {
+        jdbc.update("UPDATE users SET last_login_at = NOW() " +
+                "WHERE user_id = ?", userId);
     }
 
     @Override
     public void setActiveStatus(int userId, boolean isActive) {
-        String sql = "UPDATE users SET is_active = ? WHERE user_id = ?";
-        jdbc.update(sql, isActive, userId);
+        jdbc.update("UPDATE users SET is_active = ? WHERE user_id = ?",
+                isActive, userId);
     }
 
     @Override
     public void delete(int userId) {
-        String sql = "DELETE FROM users WHERE user_id = ?";
-        jdbc.update(sql, userId);
+        jdbc.update("DELETE FROM users WHERE user_id = ?", userId);
     }
 }

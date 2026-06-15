@@ -2,7 +2,6 @@ package com.apex.controller;
 
 import com.apex.domain.*;
 import com.apex.repository.interfaces.BiomechanicsRepository;
-import com.apex.repository.interfaces.InvoiceRepository;
 import com.apex.service.PaymentService;
 import com.apex.service.ProfileService;
 import com.apex.service.SessionService;
@@ -15,9 +14,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Handler Tier — Athlete endpoints
- * RBAC: ATHLETE and ADMIN roles only.
  * UC5, UC6, UC7, UC8, UC9, UC10, UC20
+ * All athlete self-service operations.
  */
 @RestController
 @RequestMapping("/api/athlete")
@@ -32,59 +30,72 @@ public class AthleteController {
                              SessionService sessionService,
                              BiomechanicsRepository biomechanicsRepository,
                              PaymentService paymentService) {
-        this.profileService          = profileService;
-        this.sessionService          = sessionService;
-        this.biomechanicsRepository  = biomechanicsRepository;
-        this.paymentService          = paymentService;
+        this.profileService         = profileService;
+        this.sessionService         = sessionService;
+        this.biomechanicsRepository = biomechanicsRepository;
+        this.paymentService         = paymentService;
     }
 
-    // UC6 — View Profile
+    // UC6 — Get profile by athleteId
     @GetMapping("/{athleteId}/profile")
-    public ResponseEntity<?> getProfile(@PathVariable int athleteId) {
-        Optional<Athlete> athlete = profileService.getProfile(athleteId);
+    public ResponseEntity<?> getProfile(
+            @PathVariable int athleteId) {
+        Optional<Athlete> athlete =
+                profileService.getProfile(athleteId);
         return athlete.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // UC6 — Update Profile
+    // UC6 — Get profile by userId (used after login)
+    @GetMapping("/user/{userId}/profile")
+    public ResponseEntity<?> getProfileByUserId(
+            @PathVariable int userId) {
+        Optional<Athlete> athlete =
+                profileService.getProfileByUserId(userId);
+        return athlete.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // UC6 — Update profile
     @PutMapping("/{athleteId}/profile")
     public ResponseEntity<?> updateProfile(
             @PathVariable int athleteId,
             @RequestBody Map<String, Object> body) {
         Optional<Athlete> athleteOpt =
                 profileService.getProfile(athleteId);
-        if (athleteOpt.isEmpty()) {
+        if (athleteOpt.isEmpty())
             return ResponseEntity.notFound().build();
-        }
 
         Athlete athlete = athleteOpt.get();
-        if (body.containsKey("fullName"))
-            athlete.setFullName((String) body.get("fullName"));
-        if (body.containsKey("phone"))
-            athlete.setPhone((String) body.get("phone"));
         if (body.containsKey("injuryStatus"))
-            athlete.setInjuryStatus((String) body.get("injuryStatus"));
+            athlete.setInjuryStatus(
+                    (String) body.get("injuryStatus"));
+        if (body.containsKey("sport"))
+            athlete.setSport((String) body.get("sport"));
         if (body.containsKey("bodyWeightKg"))
             athlete.setBodyWeightKg(
-                    ((Number) body.get("bodyWeightKg")).doubleValue());
+                    ((Number) body.get("bodyWeightKg"))
+                            .doubleValue());
         if (body.containsKey("heightCm"))
             athlete.setHeightCm(
-                    ((Number) body.get("heightCm")).doubleValue());
-        if (body.containsKey("postureNotes"))
-            athlete.setPostureNotes((String) body.get("postureNotes"));
+                    ((Number) body.get("heightCm"))
+                            .doubleValue());
 
         profileService.updateProfile(athlete);
         return ResponseEntity.ok(Map.of(
-                "message", "Profile updated successfully"));
+                "message", "Profile updated successfully",
+                "bmi", athlete.getBmi()
+        ));
     }
 
-    // UC5 — View Today's Sessions
+    // UC5 — Today's sessions
     @GetMapping("/sessions/today")
     public ResponseEntity<List<Session>> getTodaySessions() {
-        return ResponseEntity.ok(sessionService.getTodaySessions());
+        return ResponseEntity.ok(
+                sessionService.getTodaySessions());
     }
 
-    // UC7 — Book Rehab Session
+    // UC7 — Book session
     @PostMapping("/sessions/book")
     public ResponseEntity<?> bookSession(
             @RequestBody Map<String, Object> body) {
@@ -93,15 +104,13 @@ public class AthleteController {
             int therapistId = (Integer) body.get("therapistId");
             int facilityId  = (Integer) body.get("facilityId");
             String dateStr  = (String) body.get("sessionDate");
-            int duration    = (Integer) body.get("durationMins");
+            int duration    = body.containsKey("durationMins")
+                    ? (Integer) body.get("durationMins") : 60;
             String type     = (String) body.get("sessionType");
-
-            LocalDateTime sessionDate =
-                    LocalDateTime.parse(dateStr);
 
             Session session = sessionService.bookSession(
                     athleteId, therapistId, facilityId,
-                    sessionDate, duration, type);
+                    LocalDateTime.parse(dateStr), duration, type);
 
             return ResponseEntity.ok(Map.of(
                     "message",   "Session booked successfully",
@@ -113,7 +122,7 @@ public class AthleteController {
         }
     }
 
-    // UC8 — View Session History
+    // UC8 — Session history
     @GetMapping("/{athleteId}/sessions/history")
     public ResponseEntity<List<Session>> getSessionHistory(
             @PathVariable int athleteId) {
@@ -121,7 +130,7 @@ public class AthleteController {
                 sessionService.getSessionHistory(athleteId));
     }
 
-    // UC9 — View Upcoming Sessions
+    // UC9 — Upcoming sessions
     @GetMapping("/{athleteId}/sessions/upcoming")
     public ResponseEntity<List<Session>> getUpcomingSessions(
             @PathVariable int athleteId) {
@@ -129,7 +138,7 @@ public class AthleteController {
                 sessionService.getUpcomingSessions(athleteId));
     }
 
-    // UC9 — Cancel Session
+    // UC9 — Cancel session
     @PutMapping("/sessions/{sessionId}/cancel")
     public ResponseEntity<?> cancelSession(
             @PathVariable int sessionId) {
@@ -138,27 +147,26 @@ public class AthleteController {
                 "message", "Session cancelled successfully"));
     }
 
-    // UC9 — Reschedule Session
+    // UC9 — Reschedule session
     @PutMapping("/sessions/{sessionId}/reschedule")
     public ResponseEntity<?> rescheduleSession(
             @PathVariable int sessionId,
             @RequestBody Map<String, String> body) {
-        LocalDateTime newDate =
-                LocalDateTime.parse(body.get("newDate"));
-        sessionService.rescheduleSession(sessionId, newDate);
+        sessionService.rescheduleSession(sessionId,
+                LocalDateTime.parse(body.get("newDate")));
         return ResponseEntity.ok(Map.of(
                 "message", "Session rescheduled successfully"));
     }
 
-    // UC10 — View Recovery Metrics (read-only)
+    // UC10 — Recovery metrics
     @GetMapping("/{athleteId}/recovery-metrics")
-    public ResponseEntity<List<BiomechanicalRecord>> getRecoveryMetrics(
-            @PathVariable int athleteId) {
+    public ResponseEntity<List<BiomechanicalRecord>>
+    getRecoveryMetrics(@PathVariable int athleteId) {
         return ResponseEntity.ok(
                 biomechanicsRepository.findByAthleteId(athleteId));
     }
 
-    // UC20 — View own financial records
+    // UC20 — Own invoices
     @GetMapping("/{athleteId}/invoices")
     public ResponseEntity<List<Invoice>> getMyInvoices(
             @PathVariable int athleteId) {

@@ -5,18 +5,23 @@ import org.springframework.stereotype.Component;
 
 /**
  * Concrete Strategy 3 — Sponsorship Billing
- * Zero-fee billing for high-performance athletes
- * whose costs are absorbed by external sports sponsors.
- * Adding this class required zero modification to
+ * 100% covered by sponsor — athlete pays nothing.
+ * Adding this class required zero changes to
  * PaymentService — OCP demonstrated.
  */
 @Component("sponsorshipBilling")
 public class SponsorshipBilling implements BillingStrategy {
 
+    private static final double RATE_PER_MINUTE = 2.00;
+    private static final double DISCOUNT         = 1.0;
+
     @Override
     public double calculateFees(Session session) {
-        return 0.0;
+        return session.getDurationMins() * RATE_PER_MINUTE;
     }
+
+    @Override
+    public double getDiscountRate() { return DISCOUNT; }
 
     @Override
     public String getStrategyName() {

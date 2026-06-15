@@ -1,7 +1,8 @@
 package com.apex.controller;
 
 import com.apex.domain.*;
-import com.apex.repository.interfaces.UserRepository;
+import com.apex.repository.interfaces.ClinicalReportRepository;
+import com.apex.repository.interfaces.FacilityRepository;
 import com.apex.service.AccountService;
 import com.apex.service.PaymentService;
 import com.apex.service.ProfileService;
@@ -13,9 +14,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Handler Tier — Administrator endpoints
- * RBAC: ADMIN role only.
  * UC15, UC16, UC17, UC18, UC19, UC20
+ * All administrator operations.
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -25,18 +25,22 @@ public class AdminController {
     private final ProfileService profileService;
     private final PaymentService paymentService;
     private final AccountService accountService;
-    private final UserRepository userRepository;
+    private final FacilityRepository facilityRepository;
+    private final ClinicalReportRepository clinicalReportRepository;
 
-    public AdminController(AdmissionFacade admissionFacade,
-                           ProfileService profileService,
-                           PaymentService paymentService,
-                           AccountService accountService,
-                           UserRepository userRepository) {
-        this.admissionFacade = admissionFacade;
-        this.profileService  = profileService;
-        this.paymentService  = paymentService;
-        this.accountService  = accountService;
-        this.userRepository  = userRepository;
+    public AdminController(
+            AdmissionFacade admissionFacade,
+            ProfileService profileService,
+            PaymentService paymentService,
+            AccountService accountService,
+            FacilityRepository facilityRepository,
+            ClinicalReportRepository clinicalReportRepository) {
+        this.admissionFacade          = admissionFacade;
+        this.profileService           = profileService;
+        this.paymentService           = paymentService;
+        this.accountService           = accountService;
+        this.facilityRepository       = facilityRepository;
+        this.clinicalReportRepository = clinicalReportRepository;
     }
 
     // UC15 — Admit New Athlete (Facade Pattern showcase)
@@ -44,24 +48,22 @@ public class AdminController {
     public ResponseEntity<?> admitNewAthlete(
             @RequestBody Map<String, Object> body) {
         try {
-            String username   = (String) body.get("username");
-            String password   = (String) body.get("password");
-            String email      = (String) body.get("email");
-            String fullName   = (String) body.get("fullName");
-            int therapistId   = (Integer) body.get("therapistId");
-            int facilityId    = (Integer) body.get("facilityId");
-
-            // Single Facade call — hides all complexity
             Athlete athlete = admissionFacade.admitNewAthlete(
-                    username, password, email, fullName,
-                    therapistId, facilityId);
+                    (String) body.get("username"),
+                    (String) body.get("password"),
+                    (String) body.get("email"),
+                    (String) body.get("fullName"),
+                    (String) body.getOrDefault("contact", ""),
+                    (Integer) body.get("therapistId"),
+                    (Integer) body.get("facilityId"));
 
             return ResponseEntity.ok(Map.of(
                     "message",   "Athlete admitted successfully",
-                    "athleteId", athlete.getUserId(),
-                    "fullName",  athlete.getFullName(),
+                    "athleteId", athlete.getAthleteId(),
+                    "fullname",  athlete.getFullname(),
                     "status",    admissionFacade
-                            .getAdmissionStatus(athlete.getUserId())
+                            .getAdmissionStatus(
+                                    athlete.getAthleteId())
             ));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest()
@@ -69,48 +71,64 @@ public class AdminController {
         }
     }
 
-    // UC16 — View Analytics Dashboard
+    // UC16 — Analytics dashboard
     @GetMapping("/analytics")
     public ResponseEntity<?> getAnalytics() {
         List<Athlete> athletes = profileService.getAllAthletes();
         List<Invoice> ledger   = paymentService.getFullLedger();
 
-        long totalRevenue = (long) ledger.stream()
-                .filter(i -> i.getStatus() == InvoiceStatus.PAID)
-                .mapToDouble(Invoice::getAmount)
+        double totalRevenue = ledger.stream()
+                .mapToDouble(Invoice::getFinalAmount)
                 .sum();
 
         long pendingInvoices = ledger.stream()
-                .filter(i -> i.getStatus() == InvoiceStatus.PENDING)
+                .filter(i -> i.getStatus()
+                        == InvoiceStatus.PENDING)
                 .count();
 
         return ResponseEntity.ok(Map.of(
-                "totalAthletes",    athletes.size(),
-                "totalInvoices",    ledger.size(),
-                "totalRevenue",     totalRevenue,
-                "pendingInvoices",  pendingInvoices
+                "totalAthletes",   athletes.size(),
+                "totalInvoices",   ledger.size(),
+                "totalRevenue",    totalRevenue,
+                "pendingInvoices", pendingInvoices
         ));
     }
 
-    // UC18 — Process Session Billing (Strategy Pattern showcase)
+    // UC16 — All athletes
+    @GetMapping("/athletes")
+    public ResponseEntity<List<Athlete>> getAllAthletes() {
+        return ResponseEntity.ok(
+                profileService.getAllAthletes());
+    }
+
+    // UC17 — View facilities
+    @GetMapping("/facilities")
+    public ResponseEntity<List<Facility>> getFacilities() {
+        return ResponseEntity.ok(
+                facilityRepository.findAll());
+    }
+
+    // UC18 — Process billing (Strategy Pattern showcase)
     @PostMapping("/billing/process")
     public ResponseEntity<?> processBilling(
             @RequestBody Map<String, Object> body) {
         try {
             int sessionId  = (Integer) body.get("sessionId");
             int athleteId  = (Integer) body.get("athleteId");
-            BillingType billingType = BillingType.valueOf(
+            BillingType bt = BillingType.valueOf(
                     (String) body.get("billingType"));
 
-            Invoice invoice = paymentService.processSessionBilling(
-                    sessionId, athleteId, billingType);
+            Invoice invoice = paymentService
+                    .processSessionBilling(
+                            sessionId, athleteId, bt);
 
             return ResponseEntity.ok(Map.of(
-                    "message",      "Billing processed successfully",
-                    "invoiceId",    invoice.getInvoiceId(),
-                    "amount",       invoice.getAmount(),
-                    "billingType",  invoice.getBillingType().name(),
-                    "strategy",     paymentService
+                    "message",     "Billing processed",
+                    "invoiceId",   invoice.getInvoiceId(),
+                    "baseAmount",  invoice.getBaseAmount(),
+                    "discount",    invoice.getDiscountRate(),
+                    "finalAmount", invoice.getFinalAmount(),
+                    "strategy",    paymentService
                             .getCurrentStrategyName()
             ));
         } catch (Exception e) {
@@ -119,7 +137,7 @@ public class AdminController {
         }
     }
 
-    // UC19 — Manage Staff Profiles — Add new therapist
+    // UC19 — Add staff (Therapist or Admin)
     @PostMapping("/staff/add")
     public ResponseEntity<?> addStaff(
             @RequestBody Map<String, String> body) {
@@ -129,8 +147,9 @@ public class AdminController {
                     body.get("password"),
                     body.get("email"),
                     body.get("fullName"),
-                    Role.valueOf(body.get("role"))
-            );
+                    body.getOrDefault("contact", ""),
+                    Role.valueOf(body.get("role")));
+
             return ResponseEntity.ok(Map.of(
                     "message", "Staff account created",
                     "userId",  staff.getUserId(),
@@ -142,24 +161,35 @@ public class AdminController {
         }
     }
 
-    // UC19 — Deactivate staff account
+    // UC19 — Deactivate staff
     @PutMapping("/staff/{userId}/deactivate")
     public ResponseEntity<?> deactivateStaff(
             @PathVariable int userId) {
         accountService.deactivateAccount(userId);
         return ResponseEntity.ok(Map.of(
-                "message", "Account deactivated successfully"));
+                "message",
+                "Account deactivated successfully"));
     }
 
-    // UC20 — View Full Financial Ledger
+    // UC20 — Full financial ledger
     @GetMapping("/ledger")
     public ResponseEntity<List<Invoice>> getFullLedger() {
-        return ResponseEntity.ok(paymentService.getFullLedger());
+        return ResponseEntity.ok(
+                paymentService.getFullLedger());
     }
 
-    // UC16 — View all athletes
-    @GetMapping("/athletes")
-    public ResponseEntity<List<Athlete>> getAllAthletes() {
-        return ResponseEntity.ok(profileService.getAllAthletes());
+    // UC14 — Approve clinical report
+    @PutMapping("/reports/{reportId}/approve")
+    public ResponseEntity<?> approveReport(
+            @PathVariable int reportId,
+            @RequestBody Map<String, Integer> body) {
+        int adminId = body.get("adminId");
+        clinicalReportRepository.findById(reportId)
+                .ifPresent(report -> {
+                    report.approve(adminId);
+                    clinicalReportRepository.update(report);
+                });
+        return ResponseEntity.ok(Map.of(
+                "message", "Report approved"));
     }
 }

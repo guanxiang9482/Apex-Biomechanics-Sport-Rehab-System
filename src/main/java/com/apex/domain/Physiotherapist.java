@@ -4,64 +4,59 @@ import java.time.LocalDateTime;
 
 public class Physiotherapist extends User {
 
-    private String fullName;
+    private int therapistId;
     private String specialization;
-    private String phone;
     private String licenseNumber;
 
     // Constructor for new therapist creation
-    public Physiotherapist(String username, String passwordHash,
-                           String email, String fullName,
+    public Physiotherapist(String username, String password,
+                           String email, String fullname, String contact,
                            String specialization, String licenseNumber) {
-        super(username, passwordHash, email, Role.THERAPIST);
-        this.fullName       = fullName;
+        super(username, password, email, Role.THERAPIST, fullname, contact);
         this.specialization = specialization;
         this.licenseNumber  = licenseNumber;
     }
 
     // Constructor for loading from database
-    public Physiotherapist(int userId, String username, String passwordHash,
+    public Physiotherapist(int userId, String username, String password,
                            String email, boolean isActive,
                            LocalDateTime lastActive, LocalDateTime createdAt,
-                           String fullName, String specialization,
-                           String phone, String licenseNumber) {
-        super(userId, username, passwordHash, email, Role.THERAPIST,
-              isActive, lastActive, createdAt);
-        this.fullName       = fullName;
+                           String fullname, String specialization,
+                           String contact, String licenseNumber, int therapistId) {
+        super(userId, username, password, email, Role.THERAPIST,
+              fullname, contact, lastActive, createdAt, isActive);
         this.specialization = specialization;
-        this.phone          = phone;
         this.licenseNumber  = licenseNumber;
+        this.therapistId = therapistId;
     }
 
     // LSP contract fulfillment
     @Override
     public boolean login(String password) {
         return this.isActive() &&
-               this.getPasswordHash().equals(password);
+               this.getPassword().equals(password);
     }
 
     @Override
-    public void resetPassword(String newPasswordHash) {
-        setPasswordHash(newPasswordHash);
+    public void resetPassword(String newpassword) {
+        setPassword(newpassword);
     }
 
     // Getters
-    public String getFullName()       { return fullName; }
     public String getSpecialization() { return specialization; }
-    public String getPhone()          { return phone; }
     public String getLicenseNumber()  { return licenseNumber; }
+    public int getTherapistId() { return therapistId; }
 
     // Setters
-    public void setFullName(String fullName) {
-        if (fullName == null || fullName.isBlank())
-            throw new IllegalArgumentException(
-                "Full name cannot be empty.");
-        this.fullName = fullName;
-    }
-
     public void setSpecialization(String specialization) {
         this.specialization = specialization;
     }
-
-    public void setPhone(String phone) { this.phone = phone; }
+    public void setLicenseNumber(String licenseNumber) {
+        this.licenseNumber = licenseNumber;
+    }
+    public void setTherapistId(int therapistId) {
+        if (therapistId <= 0) throw new IllegalArgumentException(
+            "Therapist ID must be positive.");
+        this.therapistId = therapistId;
+    }
 }

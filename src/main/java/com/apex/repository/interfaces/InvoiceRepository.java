@@ -1,9 +1,10 @@
 package com.apex.repository.interfaces;
 
-import com.apex.domain.Invoice;
-import com.apex.domain.InvoiceStatus;
 import java.util.List;
 import java.util.Optional;
+
+import com.apex.domain.Invoice;
+import com.apex.domain.InvoiceStatus;
 
 // ISP: Only billing and financial operations
 public interface InvoiceRepository {

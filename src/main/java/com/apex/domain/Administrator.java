@@ -4,56 +4,49 @@ import java.time.LocalDateTime;
 
 public class Administrator extends User {
 
-    private String fullName;
-    private String phone;
+    private int adminId;
     private String department;
 
     // Constructor for new admin creation
-    public Administrator(String username, String passwordHash,
-                         String email, String fullName,
+    public Administrator(String username, String password,
+                         String email, String fullname, String contact,
                          String department) {
-        super(username, passwordHash, email, Role.ADMIN);
-        this.fullName   = fullName;
+        super(username, password, email, Role.ADMIN, fullname, contact);
         this.department = department;
     }
 
     // Constructor for loading from database
-    public Administrator(int userId, String username, String passwordHash,
+    public Administrator(int userId, String username, String password,
                          String email, boolean isActive,
                          LocalDateTime lastActive, LocalDateTime createdAt,
-                         String fullName, String phone, String department) {
-        super(userId, username, passwordHash, email, Role.ADMIN,
-              isActive, lastActive, createdAt);
-        this.fullName   = fullName;
-        this.phone      = phone;
+                         String fullname, String contact, String department, int adminId) {
+        super(userId, username, password, email, Role.ADMIN,
+              fullname, contact, lastActive, createdAt, isActive);
         this.department = department;
+        this.adminId = adminId;
     }
 
     // LSP contract fulfillment
     @Override
     public boolean login(String password) {
         return this.isActive() &&
-               this.getPasswordHash().equals(password);
+               this.getPassword().equals(password);
     }
 
     @Override
-    public void resetPassword(String newPasswordHash) {
-        setPasswordHash(newPasswordHash);
+    public void resetPassword(String newpassword) {
+        setPassword(newpassword);
     }
 
     // Getters
-    public String getFullName()   { return fullName; }
-    public String getPhone()      { return phone; }
     public String getDepartment() { return department; }
+    public int getAdminId()    { return adminId; }
 
     // Setters
-    public void setFullName(String fullName) {
-        if (fullName == null || fullName.isBlank())
-            throw new IllegalArgumentException(
-                "Full name cannot be empty.");
-        this.fullName = fullName;
-    }
-
-    public void setPhone(String phone)           { this.phone = phone; }
     public void setDepartment(String department) { this.department = department; }
+    public void setAdminId(int adminId) {
+        if (adminId <= 0) throw new IllegalArgumentException(
+            "Admin ID must be positive.");
+        this.adminId = adminId;
+    }
 }

@@ -5,69 +5,68 @@ import java.time.LocalDateTime;
 
 public class Athlete extends User {
 
-    private String fullName;
+    private int athleteId;
     private LocalDate dateOfBirth;
-    private String phone;
     private String injuryStatus;
+    private String sport;
     private double bodyWeightKg;
     private double heightCm;
-    private String postureNotes;
 
     // Constructor for new athlete registration
-    public Athlete(String username, String passwordHash,
-                   String email, String fullName) {
-        super(username, passwordHash, email, Role.ATHLETE);
-        this.fullName      = fullName;
-        this.injuryStatus  = "None";
+    public Athlete(String username, String password,
+                   String email, String fullName, String contact, String sport, 
+                   LocalDate dateOfBirth, double bodyWeightKg, double heightCm) {
+        super(username, password, email, Role.ATHLETE, fullName, contact);
+        this.sport = sport;
+        this.dateOfBirth = dateOfBirth;
+        this.injuryStatus = "None";
+        this.bodyWeightKg = bodyWeightKg;
+        this.heightCm = heightCm;
     }
 
     // Constructor for loading from database
-    public Athlete(int userId, String username, String passwordHash,
-                   String email, boolean isActive,
+    public Athlete(int userId, String username, String password,
+                   String email, String fullname, String contact, boolean isActive,
                    LocalDateTime lastActive, LocalDateTime createdAt,
-                   String fullName, LocalDate dateOfBirth, String phone,
+                   LocalDate dateOfBirth,
                    String injuryStatus, double bodyWeightKg,
-                   double heightCm, String postureNotes) {
-        super(userId, username, passwordHash, email, Role.ATHLETE,
-              isActive, lastActive, createdAt);
-        this.fullName      = fullName;
+                   double heightCm, String sport, int athleteId) {
+        super(userId, username, password, email, Role.ATHLETE, fullname, contact,
+              lastActive, createdAt, isActive);
         this.dateOfBirth   = dateOfBirth;
-        this.phone         = phone;
         this.injuryStatus  = injuryStatus;
         this.bodyWeightKg  = bodyWeightKg;
         this.heightCm      = heightCm;
-        this.postureNotes  = postureNotes;
+        this.sport         = sport;
+        this.athleteId      = athleteId; // Simple ID generation strategy
     }
 
     // LSP contract fulfillment
     @Override
     public boolean login(String password) {
         return this.isActive() &&
-               this.getPasswordHash().equals(password);
+               this.getPassword().equals(password);
     }
 
     @Override
-    public void resetPassword(String newPasswordHash) {
-        setPasswordHash(newPasswordHash);
+    public void resetPassword(String newpassword) {
+        setPassword(newpassword);
     }
 
     // Getters
-    public String getFullName()      { return fullName; }
     public LocalDate getDateOfBirth(){ return dateOfBirth; }
-    public String getPhone()         { return phone; }
     public String getInjuryStatus()  { return injuryStatus; }
     public double getBodyWeightKg()  { return bodyWeightKg; }
     public double getHeightCm()      { return heightCm; }
-    public String getPostureNotes()  { return postureNotes; }
-
-    // Controlled setters with validation
-    public void setFullName(String fullName) {
-        if (fullName == null || fullName.isBlank())
-            throw new IllegalArgumentException(
-                "Full name cannot be empty.");
-        this.fullName = fullName;
+    public String getSport()         { return (sport == null) ? "" :sport; }
+    public int getAthleteId()     { return athleteId; }
+    public double getBmi() {
+        if (heightCm <= 0 || bodyWeightKg <= 0) return 0.0;
+        double heightM = heightCm / 100.0;
+        return Math.round((bodyWeightKg / (heightM * heightM)) * 100.0) / 100.0;
     }
 
+    // Controlled setters with validation
     public void setBodyWeightKg(double bodyWeightKg) {
         if (bodyWeightKg <= 0) throw new IllegalArgumentException(
             "Body weight must be positive.");
@@ -80,8 +79,12 @@ public class Athlete extends User {
         this.heightCm = heightCm;
     }
 
-    public void setPhone(String phone)             { this.phone = phone; }
     public void setInjuryStatus(String status)     { this.injuryStatus = status; }
     public void setDateOfBirth(LocalDate dob)      { this.dateOfBirth = dob; }
-    public void setPostureNotes(String notes)      { this.postureNotes = notes; }
+    public void setSport(String sport)             { this.sport = sport; }
+    public void setAthleteId(int athleteId) {
+        if (athleteId <= 0) throw new IllegalArgumentException(
+            "Athlete ID must be positive.");
+        this.athleteId = athleteId;
+    }
 }

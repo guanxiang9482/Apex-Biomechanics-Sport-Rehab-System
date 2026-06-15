@@ -8,9 +8,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * SRP: Responsible strictly for athlete clinical
- * profile and physical metrics management.
- * Handles UC6 (Manage Personal Profile).
+ * SRP: Responsible strictly for athlete
+ * clinical profile management.
+ * UC6: Manage Personal Profile
  */
 @Service
 public class ProfileService {
@@ -21,18 +21,24 @@ public class ProfileService {
         this.athleteRepository = athleteRepository;
     }
 
-    // Called by Facade during admission (UC15)
+    // Called by Facade during UC15 admission
     public void createAthleteProfile(Athlete athlete) {
         athleteRepository.save(athlete);
     }
 
-    // UC6 — Manage Personal Profile
+    // UC6 — Update profile
     public void updateProfile(Athlete athlete) {
         athleteRepository.updateProfile(athlete);
     }
 
+    // Get by athleteId (athletes.athlete_id)
     public Optional<Athlete> getProfile(int athleteId) {
         return athleteRepository.findById(athleteId);
+    }
+
+    // Get by userId (users.user_id) — used after login
+    public Optional<Athlete> getProfileByUserId(int userId) {
+        return athleteRepository.findByUserId(userId);
     }
 
     public List<Athlete> getAllAthletes() {

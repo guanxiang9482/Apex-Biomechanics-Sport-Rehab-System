@@ -1,146 +1,200 @@
 USE apex_db;
 
 -- ============================================================
--- TIER 1: Users (Central auth table - LSP Table-per-Type)
+-- APEX BIOMECHANICS & SPORTS REHAB SYSTEM
+-- Schema v2.0 — Aligned to submitted ERD
 -- ============================================================
+
+-- Users (central auth, fullname stored here per ERD)
 CREATE TABLE IF NOT EXISTS users (
     user_id       INT AUTO_INCREMENT PRIMARY KEY,
     username      VARCHAR(50) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password      VARCHAR(255) NOT NULL,
     email         VARCHAR(100) UNIQUE NOT NULL,
     role          ENUM('ADMIN','ATHLETE','THERAPIST') NOT NULL,
-    is_active     BOOLEAN DEFAULT TRUE,
-    last_active   TIMESTAMP NULL,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- ============================================================
--- TIER 2: Role-specific tables (Table-per-Type inheritance)
--- ============================================================
-CREATE TABLE IF NOT EXISTS athletes (
-    athlete_id     INT PRIMARY KEY,
-    full_name      VARCHAR(100) NOT NULL,
-    date_of_birth  DATE,
-    phone          VARCHAR(20),
-    injury_status  VARCHAR(100) DEFAULT 'None',
-    body_weight_kg DOUBLE,
-    height_cm      DOUBLE,
-    posture_notes  TEXT,
-    FOREIGN KEY (athlete_id) REFERENCES users(user_id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS physiotherapists (
-    therapist_id   INT PRIMARY KEY,
-    full_name      VARCHAR(100) NOT NULL,
-    specialization VARCHAR(100),
-    phone          VARCHAR(20),
-    license_number VARCHAR(50),
-    FOREIGN KEY (therapist_id) REFERENCES users(user_id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS administrators (
-    admin_id   INT PRIMARY KEY,
-    full_name  VARCHAR(100) NOT NULL,
-    phone      VARCHAR(20),
-    department VARCHAR(100),
-    FOREIGN KEY (admin_id) REFERENCES users(user_id) ON DELETE CASCADE
-);
-
--- ============================================================
--- TIER 3: Facilities
--- ============================================================
-CREATE TABLE IF NOT EXISTS facilities (
-    facility_id   INT AUTO_INCREMENT PRIMARY KEY,
-    facility_name VARCHAR(100) NOT NULL,
-    facility_type VARCHAR(50),
-    is_available  BOOLEAN DEFAULT TRUE,
-    notes         TEXT
-);
-
--- ============================================================
--- TIER 4: Sessions (Core relational hub)
--- Bridges Athlete + Physiotherapist + Facility
--- Supports UC7, UC9, UC11
--- ============================================================
-CREATE TABLE IF NOT EXISTS sessions (
-    session_id    INT AUTO_INCREMENT PRIMARY KEY,
-    athlete_id    INT NOT NULL,
-    therapist_id  INT,
-    facility_id   INT,
-    session_date  DATETIME NOT NULL,
-    duration_mins INT DEFAULT 60,
-    session_type  VARCHAR(100),
-    status        ENUM('SCHEDULED','COMPLETED','CANCELLED','PENDING_FOLLOWUP')
-                  DEFAULT 'SCHEDULED',
-    notes         TEXT,
+    fullname      VARCHAR(100) NOT NULL,
+    last_login_at TIMESTAMP NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (athlete_id)  REFERENCES athletes(athlete_id),
-    FOREIGN KEY (therapist_id) REFERENCES physiotherapists(therapist_id),
-    FOREIGN KEY (facility_id)  REFERENCES facilities(facility_id)
+    is_active     BOOLEAN DEFAULT TRUE
 );
 
--- ============================================================
--- TIER 5: BiomechanicalRecords
--- Linked to session_id for audit trail (UC12)
--- ============================================================
+-- Administrators (separate PK per ERD)
+CREATE TABLE IF NOT EXISTS administrators (
+    admin_id   INT AUTO_INCREMENT PRIMARY KEY,
+    user_id    INT NOT NULL UNIQUE,
+    department VARCHAR(100),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                          ON DELETE CASCADE
+);
+
+-- Physiotherapists (separate PK per ERD)
+CREATE TABLE IF NOT EXISTS physiotherapists (
+    therapist_id   INT AUTO_INCREMENT PRIMARY KEY,
+    user_id        INT NOT NULL UNIQUE,
+    specialization VARCHAR(100),
+    license_number VARCHAR(50),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                          ON DELETE CASCADE
+);
+
+-- Athletes (separate PK per ERD)
+CREATE TABLE IF NOT EXISTS athletes (
+    athlete_id   INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT NOT NULL UNIQUE,
+    date_of_birth DATE,
+    sport        VARCHAR(100),
+    injury_status VARCHAR(100) DEFAULT 'None',
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                          ON DELETE CASCADE
+);
+
+-- Facilities
+CREATE TABLE IF NOT EXISTS facilities (
+    facility_id          INT AUTO_INCREMENT PRIMARY KEY,
+    last_used_by_therapist INT NULL,
+    name                 VARCHAR(100) NOT NULL,
+    type                 VARCHAR(50),
+    status               ENUM('AVAILABLE','MAINTENANCE',
+                              'RESERVED') DEFAULT 'AVAILABLE',
+    location             VARCHAR(100),
+    FOREIGN KEY (last_used_by_therapist)
+        REFERENCES physiotherapists(therapist_id)
+        ON DELETE SET NULL
+);
+
+-- Equipment (per ERD — contained in Facilities)
+CREATE TABLE IF NOT EXISTS equipments (
+    item_id       INT AUTO_INCREMENT PRIMARY KEY,
+    facility_id   INT NOT NULL,
+    item_name     VARCHAR(100) NOT NULL,
+    item_status   ENUM('AVAILABLE','IN_USE','MAINTENANCE')
+                  DEFAULT 'AVAILABLE',
+    item_quantity INT DEFAULT 1,
+    FOREIGN KEY (facility_id) REFERENCES facilities(facility_id)
+                              ON DELETE CASCADE
+);
+
+-- Sessions (core relational hub per ERD)
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id     INT AUTO_INCREMENT PRIMARY KEY,
+    athlete_id     INT NOT NULL,
+    therapist_id   INT NOT NULL,
+    facility_id    INT,
+    session_type   VARCHAR(100),
+    scheduled_date DATETIME NOT NULL,
+    status         ENUM('SCHEDULED','COMPLETED','CANCELLED',
+                        'PENDING_FOLLOWUP') DEFAULT 'SCHEDULED',
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (athlete_id)
+        REFERENCES athletes(athlete_id),
+    FOREIGN KEY (therapist_id)
+        REFERENCES physiotherapists(therapist_id),
+    FOREIGN KEY (facility_id)
+        REFERENCES facilities(facility_id)
+        ON DELETE SET NULL
+);
+
+-- Medical Records (per ERD — owned by athlete)
+CREATE TABLE IF NOT EXISTS medical_records (
+    record_id           INT AUTO_INCREMENT PRIMARY KEY,
+    athlete_id          INT NOT NULL,
+    created_by_therapist INT NOT NULL,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    diagnosis_notes     TEXT,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (athlete_id)
+        REFERENCES athletes(athlete_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (created_by_therapist)
+        REFERENCES physiotherapists(therapist_id)
+);
+
+-- Biomechanical Records (per ERD — has athlete_id + therapist_id)
 CREATE TABLE IF NOT EXISTS biomechanical_records (
     record_id      INT AUTO_INCREMENT PRIMARY KEY,
+    athlete_id     INT NOT NULL,
+    therapist_id   INT NOT NULL,
     session_id     INT NOT NULL,
     jump_power     DOUBLE,
     joint_mobility DOUBLE,
     posture_score  DOUBLE,
-    notes          TEXT,
     recorded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (session_id) REFERENCES sessions(session_id)
-                             ON DELETE CASCADE
+    treatment_note TEXT,
+    FOREIGN KEY (athlete_id)
+        REFERENCES athletes(athlete_id),
+    FOREIGN KEY (therapist_id)
+        REFERENCES physiotherapists(therapist_id),
+    FOREIGN KEY (session_id)
+        REFERENCES sessions(session_id)
+        ON DELETE CASCADE
 );
 
--- ============================================================
--- TIER 6: ClinicalReports
--- Finalized summaries by therapists (UC14)
--- ============================================================
-CREATE TABLE IF NOT EXISTS clinical_reports (
-    report_id    INT AUTO_INCREMENT PRIMARY KEY,
-    athlete_id   INT NOT NULL,
-    therapist_id INT NOT NULL,
-    report_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    summary      TEXT NOT NULL,
-    status       ENUM('DRAFT','FINALIZED') DEFAULT 'DRAFT',
-    FOREIGN KEY (athlete_id)  REFERENCES athletes(athlete_id),
-    FOREIGN KEY (therapist_id) REFERENCES physiotherapists(therapist_id)
-);
-
--- ============================================================
--- TIER 7: Invoices (Strategy pattern persistence - UC18, UC20)
--- ============================================================
+-- Invoices (per ERD — base_amount, discount_rate, final_amount)
 CREATE TABLE IF NOT EXISTS invoices (
-    invoice_id   INT AUTO_INCREMENT PRIMARY KEY,
-    session_id   INT NOT NULL,
-    athlete_id   INT NOT NULL,
-    billing_type ENUM('STANDARD','INSURANCE','SPONSORSHIP') NOT NULL,
-    amount       DOUBLE NOT NULL,
-    status       ENUM('PENDING','PAID','CANCELLED') DEFAULT 'PENDING',
-    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (session_id) REFERENCES sessions(session_id),
-    FOREIGN KEY (athlete_id) REFERENCES athletes(athlete_id)
+    invoice_id     INT AUTO_INCREMENT PRIMARY KEY,
+    athlete_id     INT NOT NULL,
+    session_id     INT NOT NULL,
+    base_amount    DOUBLE NOT NULL,
+    discount_rate  DOUBLE DEFAULT 0.0,
+    final_amount   DOUBLE NOT NULL,
+    billing_type   ENUM('STANDARD','INSURANCE','SPONSORSHIP')
+                   NOT NULL,
+    payment_method ENUM('CASH','CARD','INSURANCE_CLAIM',
+                        'SPONSORED','PENDING')
+                   DEFAULT 'PENDING',
+    issued_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (athlete_id)
+        REFERENCES athletes(athlete_id),
+    FOREIGN KEY (session_id)
+        REFERENCES sessions(session_id)
 );
 
--- ============================================================
--- TIER 8: NotificationLog (Observer pattern persistence - UC21)
--- ============================================================
-CREATE TABLE IF NOT EXISTS notification_log (
-    notification_id INT AUTO_INCREMENT PRIMARY KEY,
-    recipient_id    INT NOT NULL,
-    event_message   VARCHAR(500) NOT NULL,
-    is_read         BOOLEAN DEFAULT FALSE,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (recipient_id) REFERENCES users(user_id)
+-- Clinical Reports (per ERD)
+CREATE TABLE IF NOT EXISTS clinical_reports (
+    report_id          INT AUTO_INCREMENT PRIMARY KEY,
+    submit_by_therapist INT NOT NULL,
+    approve_by_admin    INT NULL,
+    report_type        VARCHAR(100),
+    description        TEXT,
+    submitted_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at        TIMESTAMP NULL,
+    status             ENUM('DRAFT','SUBMITTED','APPROVED',
+                            'REJECTED') DEFAULT 'DRAFT',
+    FOREIGN KEY (submit_by_therapist)
+        REFERENCES physiotherapists(therapist_id),
+    FOREIGN KEY (approve_by_admin)
+        REFERENCES administrators(admin_id)
+        ON DELETE SET NULL
+);
+
+-- Notification Log (per ERD)
+CREATE TABLE IF NOT EXISTS notifications_log (
+    notif_id     INT AUTO_INCREMENT PRIMARY KEY,
+    recipient_id INT NOT NULL,
+    message      VARCHAR(500) NOT NULL,
+    is_read      BOOLEAN DEFAULT FALSE,
+    timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (recipient_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE
 );
 
 -- ============================================================
 -- Seed Data
 -- ============================================================
-INSERT IGNORE INTO facilities (facility_name, facility_type, is_available) VALUES
-    ('Gait Analysis Lab A',      'Biomechanics',  TRUE),
-    ('Strength Assessment Room', 'Performance',   TRUE),
-    ('Recovery Pool',            'Hydrotherapy',  TRUE);
+INSERT INTO facilities (name, type, status, location) VALUES
+    ('Gait Analysis Lab A',      'Biomechanics',  'AVAILABLE',
+     'Block A, Level 1'),
+    ('Strength Assessment Room', 'Performance',   'AVAILABLE',
+     'Block A, Level 2'),
+    ('Recovery Pool',            'Hydrotherapy',  'AVAILABLE',
+     'Block B, Level 1');
+
+INSERT INTO equipments (facility_id, item_name, item_status,
+                        item_quantity) VALUES
+    (1, 'Force Plate',          'AVAILABLE', 2),
+    (1, 'Motion Capture Camera','AVAILABLE', 4),
+    (2, 'Resistance Bands',     'AVAILABLE', 10),
+    (2, 'Barbell Set',          'AVAILABLE', 3),
+    (3, 'Underwater Treadmill', 'AVAILABLE', 1);
