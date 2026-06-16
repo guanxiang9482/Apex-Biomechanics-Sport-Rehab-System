@@ -5,7 +5,7 @@ import { formatDateTime, statusClass } from '../utils/format';
 import './Dashboard.css';
 
 const initialMetricForm = {
-  athleteId: '',
+  athleteName: '',
   sessionId: '',
   jumpPower: '',
   jointMobility: '',
@@ -14,6 +14,7 @@ const initialMetricForm = {
 };
 
 const initialReportForm = {
+  athleteName: '',
   reportType: 'Progress Review',
   description: '',
 };
@@ -28,6 +29,7 @@ function TherapistDashboard() {
   const [records, setRecords] = useState([]);
   const [reports, setReports] = useState([]);
   const [therapistProfile, setTherapistProfile] = useState(null);
+  const [athletes, setAthletes] = useState([]);
   const [noticeList, setNoticeList] = useState([]);
   const [metricForm, setMetricForm] = useState(initialMetricForm);
   const [recordLookupId, setRecordLookupId] = useState('');
@@ -42,12 +44,14 @@ function TherapistDashboard() {
 
     try {
       const profile = await therapist.getProfileByUserId(user.userId);
-      const [todayRoster, userNotifications] = await Promise.all([
+      const [todayRoster, athleteData, userNotifications] = await Promise.all([
         therapist.getTodayRoster(profile.therapistId),
+        therapist.getAthletes(),
         notifications.getAll(user.userId),
       ]);
       setTherapistProfile(profile);
       setRoster(todayRoster);
+      setAthletes(athleteData);
       setNoticeList(userNotifications);
     } catch (error) {
       showMessage('error', error.message);
@@ -77,7 +81,11 @@ function TherapistDashboard() {
 
   const updateMetricForm = (event) => {
     const { name, value } = event.target;
-    setMetricForm((current) => ({ ...current, [name]: value }));
+    setMetricForm((current) => ({
+      ...current,
+      [name]: value,
+      ...(name === 'athleteName' ? { sessionId: '' } : {}),
+    }));
   };
 
   const updateReportForm = (event) => {
@@ -101,9 +109,14 @@ function TherapistDashboard() {
       showMessage('error', 'Therapist profile is still loading. Please try again.');
       return;
     }
+    const selectedAthlete = findAthleteByName(athletes, metricForm.athleteName);
+    if (!selectedAthlete) {
+      showMessage('error', 'Please choose an athlete from the name suggestions.');
+      return;
+    }
     try {
       await therapist.logBiomechanicalData(
-        Number(metricForm.athleteId),
+        selectedAthlete.athleteId,
         therapistProfile.therapistId,
         Number(metricForm.sessionId),
         Number(metricForm.jumpPower),
@@ -133,8 +146,18 @@ function TherapistDashboard() {
       showMessage('error', 'Therapist profile is still loading. Please try again.');
       return;
     }
+    const selectedAthlete = findAthleteByName(athletes, reportForm.athleteName);
+    if (!selectedAthlete) {
+      showMessage('error', 'Please choose an athlete from the name suggestions.');
+      return;
+    }
     try {
-      await therapist.generateReport(therapistProfile.therapistId, reportForm.reportType, reportForm.description);
+      await therapist.generateReport(
+        selectedAthlete.athleteId,
+        therapistProfile.therapistId,
+        reportForm.reportType,
+        reportForm.description,
+      );
       setReportForm(initialReportForm);
       showMessage('success', 'Clinical report generated successfully.');
     } catch (error) {
@@ -195,6 +218,12 @@ function TherapistDashboard() {
         </div>
       </header>
 
+      <datalist id="therapist-athletes">
+        {athletes.map((athleteItem) => (
+          <option value={formatAthleteName(athleteItem)} key={athleteItem.athleteId} />
+        ))}
+      </datalist>
+
       <main className="main-content therapist-main">
         <header className="content-header therapist-hero">
           <div>
@@ -242,7 +271,7 @@ function TherapistDashboard() {
                       <h3>{session.sessionType || 'Rehab Session'}</h3>
                       <span className={statusClass(session.status)}>{session.status}</span>
                     </div>
-                    <p>Athlete #{session.athleteId}</p>
+                    <p>{formatSessionAthleteName(session, athletes)}</p>
                     <p>{formatDateTime(session.sessionDate)}</p>
                     <p>Facility #{session.facilityId || '-'} · {session.durationMins} minutes</p>
                     <div className="card-actions">
@@ -261,12 +290,19 @@ function TherapistDashboard() {
           <section className="section section-stack">
             <form className="panel form-grid" onSubmit={handleMetricSubmit}>
               <label>
-                Athlete ID
-                <input name="athleteId" type="number" min="1" value={metricForm.athleteId} onChange={updateMetricForm} required />
+                Athlete Name
+                <input name="athleteName" list="therapist-athletes" value={metricForm.athleteName} onChange={updateMetricForm} placeholder="Start typing athlete name" required />
               </label>
               <label>
-                Session ID
-                <input name="sessionId" type="number" min="1" value={metricForm.sessionId} onChange={updateMetricForm} required />
+                Session
+                <select name="sessionId" value={metricForm.sessionId} onChange={updateMetricForm} required>
+                  <option value="">Choose session</option>
+                  {getSessionsForAthlete(roster, athletes, metricForm.athleteName).map((session) => (
+                    <option value={session.sessionId} key={session.sessionId}>
+                      {formatSessionOption(session, athletes)}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Jump Power
@@ -318,6 +354,10 @@ function TherapistDashboard() {
         {activeSection === 'reports' && (
           <section className="section section-stack">
             <form className="panel form-grid single-column" onSubmit={handleReportSubmit}>
+              <label>
+                Athlete Name
+                <input name="athleteName" list="therapist-athletes" value={reportForm.athleteName} onChange={updateReportForm} placeholder="Start typing athlete name" required />
+              </label>
               <label>
                 Report Type
                 <input name="reportType" value={reportForm.reportType} onChange={updateReportForm} required />
@@ -383,6 +423,45 @@ function TherapistDashboard() {
       </main>
     </div>
   );
+}
+
+function formatAthleteName(athlete) {
+  if (!athlete) return '';
+  const name = athlete.fullname || athlete.fullName || athlete.username || 'Unnamed athlete';
+  return athlete.username && athlete.username !== name ? `${name} (${athlete.username})` : name;
+}
+
+function normalizeName(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function findAthleteByName(athletes, typedName) {
+  const needle = normalizeName(typedName);
+  if (!needle) return null;
+
+  return athletes.find((athlete) => {
+    const fullLabel = normalizeName(formatAthleteName(athlete));
+    const fullname = normalizeName(athlete.fullname || athlete.fullName);
+    const username = normalizeName(athlete.username);
+    return needle === fullLabel || needle === fullname || needle === username;
+  }) || null;
+}
+
+function getSessionsForAthlete(roster, athletes, typedName) {
+  const selectedAthlete = findAthleteByName(athletes, typedName);
+  if (!selectedAthlete) return roster;
+  return roster.filter((session) => session.athleteId === selectedAthlete.athleteId);
+}
+
+function formatSessionOption(session, athletes) {
+  const athlete = athletes.find((item) => item.athleteId === session.athleteId);
+  const athleteName = athlete ? formatAthleteName(athlete) : 'Assigned athlete';
+  return `${athleteName} - ${session.sessionType || 'Rehab Session'} - ${formatDateTime(session.sessionDate)}`;
+}
+
+function formatSessionAthleteName(session, athletes) {
+  const athlete = athletes.find((item) => item.athleteId === session.athleteId);
+  return athlete ? formatAthleteName(athlete) : 'Assigned athlete';
 }
 
 export default TherapistDashboard;

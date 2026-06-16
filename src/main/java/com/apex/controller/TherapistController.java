@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.apex.domain.Athlete;
 import com.apex.domain.BiomechanicalRecord;
 import com.apex.domain.ClinicalReport;
 import com.apex.domain.MedicalRecord;
@@ -23,6 +24,7 @@ import com.apex.repository.interfaces.BiomechanicsRepository;
 import com.apex.repository.interfaces.ClinicalReportRepository;
 import com.apex.repository.interfaces.MedicalRecordRepository;
 import com.apex.repository.interfaces.PhysiotherapistRepository;
+import com.apex.service.ProfileService;
 import com.apex.service.SessionService;
 
 /**
@@ -45,18 +47,21 @@ public class TherapistController {
     private final MedicalRecordRepository medicalRecordRepository;
     private final ClinicalReportRepository clinicalReportRepository;
     private final PhysiotherapistRepository physiotherapistRepository;
+    private final ProfileService profileService;
 
     public TherapistController(
             SessionService sessionService,
             BiomechanicsRepository biomechanicsRepository,
             MedicalRecordRepository medicalRecordRepository,
             ClinicalReportRepository clinicalReportRepository,
-            PhysiotherapistRepository physiotherapistRepository) {
+            PhysiotherapistRepository physiotherapistRepository,
+            ProfileService profileService) {
         this.sessionService           = sessionService;
         this.biomechanicsRepository   = biomechanicsRepository;
         this.medicalRecordRepository  = medicalRecordRepository;
         this.clinicalReportRepository = clinicalReportRepository;
         this.physiotherapistRepository = physiotherapistRepository;
+        this.profileService           = profileService;
     }
 
     @GetMapping("/user/{userId}/profile")
@@ -65,6 +70,11 @@ public class TherapistController {
         return physiotherapistRepository.findByUserId(userId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/athletes")
+    public ResponseEntity<List<Athlete>> getAthletes() {
+        return ResponseEntity.ok(profileService.getAllAthletes());
     }
 
     // UC11 — Today's roster

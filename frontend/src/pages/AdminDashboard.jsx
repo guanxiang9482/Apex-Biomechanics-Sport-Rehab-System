@@ -15,7 +15,7 @@ const initialAdmission = {
 
 const initialBilling = {
   sessionId: '',
-  athleteId: '',
+  athleteName: '',
   billingType: 'STANDARD',
 };
 
@@ -132,7 +132,7 @@ function AdminDashboard() {
         Number(admissionForm.facilityId),
       );
       setAdmissionForm(initialAdmission);
-      showMessage('success', `${result.fullname || result.fullName} admitted successfully. Athlete ID: ${result.athleteId}`);
+      showMessage('success', `${result.fullname || result.fullName || admissionForm.fullName} admitted successfully.`);
       await loadDashboard();
     } catch (error) {
       showMessage('error', error.message);
@@ -141,10 +141,15 @@ function AdminDashboard() {
 
   const handleBilling = async (event) => {
     event.preventDefault();
+    const selectedAthlete = findAthleteByName(athletes, billingForm.athleteName);
+    if (!selectedAthlete) {
+      showMessage('error', 'Please choose an athlete from the name suggestions.');
+      return;
+    }
     try {
       const result = await admin.processBilling(
         Number(billingForm.sessionId),
-        Number(billingForm.athleteId),
+        selectedAthlete.athleteId,
         billingForm.billingType,
       );
       setBillingResult(result);
@@ -232,6 +237,12 @@ function AdminDashboard() {
           <button className="logout-btn admin-logout" onClick={handleLogout}>Logout</button>
         </div>
       </header>
+
+      <datalist id="admin-athletes">
+        {athletes.map((athleteProfile) => (
+          <option value={formatAthleteName(athleteProfile)} key={athleteProfile.athleteId} />
+        ))}
+      </datalist>
 
       <main className="main-content admin-main">
         <header className="content-header admin-hero">
@@ -367,8 +378,8 @@ function AdminDashboard() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>ID</th>
-                        <th>Name</th>
+                        <th>Athlete</th>
+                        <th>Username</th>
                         <th>Email</th>
                         <th>Injury</th>
                         <th>Body</th>
@@ -376,9 +387,9 @@ function AdminDashboard() {
                     </thead>
                     <tbody>
                       {athletes.map((athleteProfile) => (
-                        <tr key={athleteProfile.userId}>
-                          <td>#{athleteProfile.userId}</td>
-                          <td>{athleteProfile.fullName}</td>
+                        <tr key={athleteProfile.athleteId}>
+                          <td>{formatAthleteName(athleteProfile)}</td>
+                          <td>{athleteProfile.username}</td>
                           <td>{athleteProfile.email}</td>
                           <td>{athleteProfile.injuryStatus || 'None'}</td>
                           <td>{athleteProfile.heightCm || '-'} cm / {athleteProfile.bodyWeightKg || '-'} kg</td>
@@ -400,8 +411,8 @@ function AdminDashboard() {
                 <input name="sessionId" type="number" min="1" value={billingForm.sessionId} onChange={updateBilling} required />
               </label>
               <label>
-                Athlete ID
-                <input name="athleteId" type="number" min="1" value={billingForm.athleteId} onChange={updateBilling} required />
+                Athlete Name
+                <input name="athleteName" list="admin-athletes" value={billingForm.athleteName} onChange={updateBilling} placeholder="Start typing athlete name" required />
               </label>
               <label>
                 Billing Strategy
@@ -427,7 +438,7 @@ function AdminDashboard() {
                 <h2>Financial Ledger</h2>
                 <span>UC20</span>
               </div>
-              <LedgerTable ledger={ledger} />
+              <LedgerTable ledger={ledger} athletes={athletes} />
             </div>
           </section>
         )}
@@ -520,7 +531,7 @@ function AdminDashboard() {
   );
 }
 
-function LedgerTable({ ledger }) {
+function LedgerTable({ ledger, athletes }) {
   if (ledger.length === 0) {
     return <p className="empty-state">No financial records found.</p>;
   }
@@ -544,7 +555,7 @@ function LedgerTable({ ledger }) {
             <tr key={invoice.invoiceId}>
               <td>#{invoice.invoiceId}</td>
               <td>#{invoice.sessionId}</td>
-              <td>#{invoice.athleteId}</td>
+              <td>{formatAthleteName(athletes.find((athlete) => athlete.athleteId === invoice.athleteId)) || 'Athlete record'}</td>
               <td>{invoice.billingType}</td>
               <td>{formatCurrency(invoice.finalAmount ?? invoice.amount)}</td>
               <td><span className={statusClass(invoice.status)}>{invoice.status}</span></td>
@@ -555,6 +566,28 @@ function LedgerTable({ ledger }) {
       </table>
     </div>
   );
+}
+
+function formatAthleteName(athlete) {
+  if (!athlete) return '';
+  const name = athlete.fullname || athlete.fullName || athlete.username || 'Unnamed athlete';
+  return athlete.username && athlete.username !== name ? `${name} (${athlete.username})` : name;
+}
+
+function normalizeName(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function findAthleteByName(athletes, typedName) {
+  const needle = normalizeName(typedName);
+  if (!needle) return null;
+
+  return athletes.find((athlete) => {
+    const fullLabel = normalizeName(formatAthleteName(athlete));
+    const fullname = normalizeName(athlete.fullname || athlete.fullName);
+    const username = normalizeName(athlete.username);
+    return needle === fullLabel || needle === fullname || needle === username;
+  }) || null;
 }
 
 export default AdminDashboard;
