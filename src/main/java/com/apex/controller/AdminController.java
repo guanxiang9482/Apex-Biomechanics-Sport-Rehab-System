@@ -21,11 +21,13 @@ import com.apex.domain.Facility;
 import com.apex.domain.FacilityStatus;
 import com.apex.domain.Invoice;
 import com.apex.domain.InvoiceStatus;
+import com.apex.domain.Physiotherapist;
 import com.apex.domain.Role;
 import com.apex.domain.User;
 import com.apex.repository.interfaces.ClinicalReportRepository;
 import com.apex.repository.interfaces.EquipmentRepository;
 import com.apex.repository.interfaces.FacilityRepository;
+import com.apex.repository.interfaces.PhysiotherapistRepository;
 import com.apex.repository.interfaces.UserRepository;
 import com.apex.service.AccountService;
 import com.apex.service.PaymentService;
@@ -51,7 +53,11 @@ public class AdminController {
     private final FacilityRepository facilityRepository;
     private final EquipmentRepository equipmentRepository;
     private final ClinicalReportRepository clinicalReportRepository;
+<<<<<<< HEAD
     private final UserRepository userRepository;
+=======
+    private final PhysiotherapistRepository physiotherapistRepository;
+>>>>>>> 98ea01b18eb78eda5cfacd0cc6df91d79caf0d9c
 
     public AdminController(
             AdmissionFacade admissionFacade,
@@ -59,9 +65,14 @@ public class AdminController {
             PaymentService paymentService,
             AccountService accountService,
             FacilityRepository facilityRepository,
+<<<<<<< HEAD
             EquipmentRepository equipmentRepository,
             ClinicalReportRepository clinicalReportRepository,
             UserRepository userRepository) {
+=======
+            ClinicalReportRepository clinicalReportRepository,
+            PhysiotherapistRepository physiotherapistRepository) {
+>>>>>>> 98ea01b18eb78eda5cfacd0cc6df91d79caf0d9c
         this.admissionFacade          = admissionFacade;
         this.profileService           = profileService;
         this.paymentService           = paymentService;
@@ -69,7 +80,11 @@ public class AdminController {
         this.facilityRepository       = facilityRepository;
         this.equipmentRepository      = equipmentRepository;
         this.clinicalReportRepository = clinicalReportRepository;
+<<<<<<< HEAD
         this.userRepository           = userRepository;
+=======
+        this.physiotherapistRepository = physiotherapistRepository;
+>>>>>>> 98ea01b18eb78eda5cfacd0cc6df91d79caf0d9c
     }
 
     // UC15 — Admit New Athlete (Facade Pattern showcase)
@@ -140,6 +155,7 @@ public class AdminController {
                 facilityRepository.findAll());
     }
 
+<<<<<<< HEAD
     // UC17 — Update facility status (AVAILABLE / MAINTENANCE / RESERVED)
     @PutMapping("/facilities/{facilityId}/status")
     public ResponseEntity<?> updateFacilityStatus(
@@ -192,6 +208,15 @@ public class AdminController {
 
     // ─── UC18: Process Session Billing ───────────────────────────
 
+=======
+    @GetMapping("/therapists")
+    public ResponseEntity<List<Physiotherapist>> getTherapists() {
+        return ResponseEntity.ok(
+                physiotherapistRepository.findAll());
+    }
+
+    // UC18 — Process billing (Strategy Pattern showcase)
+>>>>>>> 98ea01b18eb78eda5cfacd0cc6df91d79caf0d9c
     @PostMapping("/billing/process")
     public ResponseEntity<?> processBilling(
             @RequestBody Map<String, Object> body) {

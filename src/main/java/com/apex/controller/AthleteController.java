@@ -2,12 +2,15 @@ package com.apex.controller;
 
 import com.apex.domain.*;
 import com.apex.repository.interfaces.BiomechanicsRepository;
+import com.apex.repository.interfaces.FacilityRepository;
+import com.apex.repository.interfaces.PhysiotherapistRepository;
 import com.apex.service.PaymentService;
 import com.apex.service.ProfileService;
 import com.apex.service.SessionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -25,15 +28,21 @@ public class AthleteController {
     private final SessionService sessionService;
     private final BiomechanicsRepository biomechanicsRepository;
     private final PaymentService paymentService;
+    private final FacilityRepository facilityRepository;
+    private final PhysiotherapistRepository physiotherapistRepository;
 
     public AthleteController(ProfileService profileService,
                              SessionService sessionService,
                              BiomechanicsRepository biomechanicsRepository,
-                             PaymentService paymentService) {
+                             PaymentService paymentService,
+                             FacilityRepository facilityRepository,
+                             PhysiotherapistRepository physiotherapistRepository) {
         this.profileService         = profileService;
         this.sessionService         = sessionService;
         this.biomechanicsRepository = biomechanicsRepository;
         this.paymentService         = paymentService;
+        this.facilityRepository     = facilityRepository;
+        this.physiotherapistRepository = physiotherapistRepository;
     }
 
     // UC6 — Get profile by athleteId
@@ -93,6 +102,37 @@ public class AthleteController {
     public ResponseEntity<List<Session>> getTodaySessions() {
         return ResponseEntity.ok(
                 sessionService.getTodaySessions());
+    }
+
+    @GetMapping("/therapists")
+    public ResponseEntity<List<Physiotherapist>> getTherapists() {
+        return ResponseEntity.ok(
+                physiotherapistRepository.findAll());
+    }
+
+    @GetMapping("/facilities")
+    public ResponseEntity<List<Facility>> getFacilities() {
+        return ResponseEntity.ok(
+                facilityRepository.findAll());
+    }
+
+    @GetMapping("/sessions/availability")
+    public ResponseEntity<?> getAvailableSlots(
+            @RequestParam int therapistId,
+            @RequestParam int facilityId,
+            @RequestParam String date,
+            @RequestParam(defaultValue = "60") int durationMins) {
+        try {
+            return ResponseEntity.ok(Map.of(
+                    "availableSlots",
+                    sessionService.getAvailableSlots(
+                            therapistId, facilityId,
+                            LocalDate.parse(date), durationMins)
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 
     // UC7 — Book session

@@ -16,7 +16,7 @@ INSERT INTO equipments (facility_id, item_name, item_status, item_quantity) VALU
 
 -- Admin account (password: Admin@2026)
 INSERT INTO users (username, password, email, role, fullname, contact, is_active)
-VALUES ('admin', '$2a$10$slnP5PdWFvYBDMcmBPAGQOoHQqM5OLDCp7yIBzF7alZLZPHbHJBEu',
+VALUES ('admin', '$2a$10$QNDumlEXyS7e8E8QpK7PDOjNEE7pAjvH39PkcDAIA2CXP.9OiNK9S',
         'admin@apex.com', 'ADMIN', 'System Administrator', '0123456789', TRUE);
 
 SET @admin_user_id = LAST_INSERT_ID();
@@ -25,7 +25,7 @@ VALUES (@admin_user_id, 'Management');
 
 -- Therapist account (password: Admin@2026)
 INSERT INTO users (username, password, email, role, fullname, contact, is_active)
-VALUES ('therapist1', '$2a$10$slnP5PdWFvYBDMcmBPAGQOoHQqM5OLDCp7yIBzF7alZLZPHbHJBEu',
+VALUES ('therapist1', '$2a$10$Eg0qTieY9CPFksjD6l9NT.9OkgNcTFO8d6/MbuiW0Uq6pOe8ZptlC',
         'therapist1@apex.com', 'THERAPIST', 'Dr. Sarah Brown', '0123456780', TRUE);
 
 SET @therapist_user_id = LAST_INSERT_ID();

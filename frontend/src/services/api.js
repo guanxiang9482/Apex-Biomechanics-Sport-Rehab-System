@@ -37,10 +37,18 @@ export const auth = {
 export const athlete = {
   getProfile: (athleteId) =>
     request(`/athlete/${athleteId}/profile`),
+  getProfileByUserId: (userId) =>
+    request(`/athlete/user/${userId}/profile`),
   updateProfile: (athleteId, profileData) =>
     request(`/athlete/${athleteId}/profile`, 'PUT', profileData),
   getTodaySessions: () =>
     request('/athlete/sessions/today'),
+  getTherapists: () =>
+    request('/athlete/therapists'),
+  getFacilities: () =>
+    request('/athlete/facilities'),
+  getAvailableSlots: (therapistId, facilityId, date, durationMins) =>
+    request(`/athlete/sessions/availability?therapistId=${therapistId}&facilityId=${facilityId}&date=${date}&durationMins=${durationMins}`),
   bookSession: (athleteId, therapistId, facilityId, sessionDate, durationMins, sessionType) =>
     request('/athlete/sessions/book', 'POST', {
       athleteId, therapistId, facilityId, sessionDate, durationMins, sessionType,
@@ -60,20 +68,22 @@ export const athlete = {
 };
 
 export const therapist = {
+  getProfileByUserId: (userId) =>
+    request(`/therapist/user/${userId}/profile`),
   getTodayRoster: (therapistId) =>
     request(`/therapist/${therapistId}/roster/today`),
-  logBiomechanicalData: (sessionId, jumpPower, jointMobility, postureScore, notes) =>
+  logBiomechanicalData: (athleteId, therapistId, sessionId, jumpPower, jointMobility, postureScore, treatmentNote) =>
     request('/therapist/biomechanics/log', 'POST', {
-      sessionId, jumpPower, jointMobility, postureScore, notes,
+      athleteId, therapistId, sessionId, jumpPower, jointMobility, postureScore, treatmentNote,
     }),
   getBiomechanicalsBySession: (sessionId) =>
     request(`/therapist/biomechanics/session/${sessionId}`),
   updateSessionStatus: (sessionId, status) =>
     request(`/therapist/sessions/${sessionId}/status`, 'PUT', { status }),
-  generateReport: (athleteId, therapistId, summary) =>
-    request('/therapist/reports/generate', 'POST', { athleteId, therapistId, summary }),
-  getAthleteReports: (athleteId) =>
-    request(`/therapist/reports/${athleteId}`),
+  generateReport: (therapistId, reportType, description) =>
+    request('/therapist/reports/generate', 'POST', { therapistId, reportType, description }),
+  getTherapistReports: (therapistId) =>
+    request(`/therapist/reports/${therapistId}`),
 };
 
 export const admin = {
@@ -85,6 +95,10 @@ export const admin = {
     request('/admin/analytics'),
   getAllAthletes: () =>
     request('/admin/athletes'),
+  getFacilities: () =>
+    request('/admin/facilities'),
+  getTherapists: () =>
+    request('/admin/therapists'),
   processBilling: (sessionId, athleteId, billingType) =>
     request('/admin/billing/process', 'POST', { sessionId, athleteId, billingType }),
   addStaff: (username, password, email, fullName, role) =>
