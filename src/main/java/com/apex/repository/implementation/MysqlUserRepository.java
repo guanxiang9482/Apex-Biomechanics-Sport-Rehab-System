@@ -115,6 +115,14 @@ public class MysqlUserRepository implements UserRepository {
     }
 
     @Override
+    public void updateStaffInfo(int userId, String email, String fullname,
+                                String contact) {
+        jdbc.update("UPDATE users SET email = ?, fullname = ?, " +
+                        "contact = ? WHERE user_id = ?",
+                email, fullname, contact, userId);
+    }
+
+    @Override
     public void setActiveStatus(int userId, boolean isActive) {
         jdbc.update("UPDATE users SET is_active = ? WHERE user_id = ?",
                 isActive, userId);

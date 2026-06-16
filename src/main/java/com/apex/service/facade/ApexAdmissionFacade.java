@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
  * Step 1: AccountService.createAccount() — credentials
  * Step 2: ProfileService (via AccountService) — clinical profile
  * Step 3: SessionService.scheduleInitialSession() — booking
- * Step 4: NotificationEngine.notifyAllObservers() — Observer fires
+ * Step 4: NotificationEngine.notifyObserver() — Observer fires
  *
  * Atomic rollback on any step failure.
  */
@@ -61,11 +61,11 @@ public class ApexAdmissionFacade implements AdmissionFacade {
             sessionService.scheduleInitialSession(
                     athlete.getAthleteId(), therapistId, facilityId);
 
-            // Step 4 — Observer fires, notifies all subscribers
-            notificationEngine.notifyAllObservers(
-                    "New athlete admitted: " + fullname +
-                    " (ID:" + athlete.getAthleteId() + "). " +
-                    "Initial evaluation session scheduled.");
+            // Step 4 - Observer fires for the admitted athlete.
+            notificationEngine.notifyObserver(
+                    athlete.getUserId(),
+                    "Admission completed for " + fullname +
+                    ". Initial evaluation session scheduled.");
 
             return athlete;
 

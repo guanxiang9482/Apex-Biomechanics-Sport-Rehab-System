@@ -9,6 +9,7 @@ const initialAdmission = {
   password: '',
   email: '',
   fullName: '',
+  contact: '',
   therapistId: '',
   facilityId: '1',
 };
@@ -24,6 +25,7 @@ const initialStaff = {
   password: '',
   email: '',
   fullName: '',
+  contact: '',
   role: 'THERAPIST',
 };
 
@@ -42,14 +44,18 @@ function AdminDashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [athletes, setAthletes] = useState([]);
   const [ledger, setLedger] = useState([]);
+  const [completedSessions, setCompletedSessions] = useState([]);
   const [facilities, setFacilities] = useState(fallbackFacilities);
+  const [selectedFacilityId, setSelectedFacilityId] = useState('');
+  const [equipment, setEquipment] = useState([]);
   const [therapists, setTherapists] = useState([]);
+  const [staff, setStaff] = useState([]);
   const [noticeList, setNoticeList] = useState([]);
   const [admissionForm, setAdmissionForm] = useState(initialAdmission);
   const [billingForm, setBillingForm] = useState(initialBilling);
   const [billingResult, setBillingResult] = useState(null);
   const [staffForm, setStaffForm] = useState(initialStaff);
-  const [deactivateId, setDeactivateId] = useState('');
+  const [editingStaff, setEditingStaff] = useState(null);
 
   const showMessage = (type, text) => setMessage({ type, text });
 
@@ -59,20 +65,25 @@ function AdminDashboard() {
     setMessage(null);
 
     try {
-      const [analyticsData, athleteData, ledgerData, facilityData, therapistData, userNotifications] = await Promise.all([
+      const [analyticsData, athleteData, ledgerData, facilityData, therapistData, completedSessionData, staffData, userNotifications] = await Promise.all([
         admin.getAnalytics(),
         admin.getAllAthletes(),
         admin.getFullLedger(),
         admin.getFacilities(),
         admin.getTherapists(),
+        admin.getCompletedSessions(),
+        admin.getAllStaff(),
         notifications.getAll(user.userId),
       ]);
 
       setAnalytics(analyticsData);
       setAthletes(athleteData);
       setLedger(ledgerData);
+      setCompletedSessions(completedSessionData);
       setFacilities(facilityData.length > 0 ? facilityData : fallbackFacilities);
       setTherapists(therapistData);
+      setStaff(staffData);
+      setSelectedFacilityId((current) => current || String(facilityData[0]?.facilityId || fallbackFacilities[0].id));
       setAdmissionForm((current) => ({
         ...current,
         therapistId: current.therapistId || String(therapistData[0]?.therapistId || ''),
@@ -112,12 +123,21 @@ function AdminDashboard() {
 
   const updateBilling = (event) => {
     const { name, value } = event.target;
-    setBillingForm((current) => ({ ...current, [name]: value }));
+    setBillingForm((current) => ({
+      ...current,
+      [name]: value,
+      ...(name === 'athleteName' ? { sessionId: '' } : {}),
+    }));
   };
 
   const updateStaff = (event) => {
     const { name, value } = event.target;
     setStaffForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const updateEditingStaff = (event) => {
+    const { name, value } = event.target;
+    setEditingStaff((current) => ({ ...current, [name]: value }));
   };
 
   const handleAdmission = async (event) => {
@@ -128,6 +148,7 @@ function AdminDashboard() {
         admissionForm.password,
         admissionForm.email.trim(),
         admissionForm.fullName.trim(),
+        admissionForm.contact.trim(),
         Number(admissionForm.therapistId),
         Number(admissionForm.facilityId),
       );
@@ -139,11 +160,49 @@ function AdminDashboard() {
     }
   };
 
+  const startEditStaff = (staffMember) => {
+    setEditingStaff({
+      userId: staffMember.userId,
+      role: staffMember.role,
+      fullName: staffMember.fullname || staffMember.fullName || staffMember.username || '',
+      email: staffMember.email || '',
+      contact: staffMember.contact || '',
+      specialization: staffMember.specialization || '',
+      licenseNumber: staffMember.licenseNumber || '',
+    });
+  };
+
+  const handleUpdateStaff = async (event) => {
+    event.preventDefault();
+    if (!editingStaff?.userId) return;
+
+    try {
+      await admin.updateStaff(editingStaff.userId, {
+        fullName: editingStaff.fullName.trim(),
+        email: editingStaff.email.trim(),
+        contact: editingStaff.contact.trim(),
+        specialization: editingStaff.specialization.trim(),
+        licenseNumber: editingStaff.licenseNumber.trim(),
+      });
+      setEditingStaff(null);
+      showMessage('success', 'Staff profile updated successfully.');
+      await loadDashboard();
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
   const handleBilling = async (event) => {
     event.preventDefault();
     const selectedAthlete = findAthleteByName(athletes, billingForm.athleteName);
     if (!selectedAthlete) {
       showMessage('error', 'Please choose an athlete from the name suggestions.');
+      return;
+    }
+    const selectedSession = completedSessions.find((session) =>
+      session.sessionId === Number(billingForm.sessionId));
+    if (!selectedSession || selectedSession.athleteId !== selectedAthlete.athleteId) {
+      showMessage('error', 'Please choose a completed session for the selected athlete.');
       return;
     }
     try {
@@ -163,26 +222,68 @@ function AdminDashboard() {
   const handleAddStaff = async (event) => {
     event.preventDefault();
     try {
-      const result = await admin.addStaff(
+      await admin.addStaff(
         staffForm.username.trim(),
         staffForm.password,
         staffForm.email.trim(),
         staffForm.fullName.trim(),
+        staffForm.contact.trim(),
         staffForm.role,
       );
       setStaffForm(initialStaff);
-      showMessage('success', `Staff account created. User ID: ${result.userId}`);
+      showMessage('success', `${staffForm.fullName || staffForm.username} staff account created.`);
+      await loadDashboard();
     } catch (error) {
       showMessage('error', error.message);
     }
   };
 
-  const handleDeactivateStaff = async (event) => {
-    event.preventDefault();
+  const handleDeactivateStaff = async (userId) => {
     try {
-      await admin.deactivateStaff(Number(deactivateId));
-      setDeactivateId('');
+      await admin.deactivateStaff(userId);
       showMessage('success', 'Staff account deactivated successfully.');
+      await loadDashboard();
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
+  const handleDeleteStaff = async (userId) => {
+    try {
+      await admin.deleteStaff(userId);
+      showMessage('success', 'Staff account deleted successfully.');
+      await loadDashboard();
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
+  const handleFacilityStatus = async (facilityId, status) => {
+    try {
+      await admin.updateFacilityStatus(facilityId, status);
+      showMessage('success', 'Facility status updated successfully.');
+      await loadDashboard();
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
+  const handleLoadEquipment = async (facilityId) => {
+    setSelectedFacilityId(String(facilityId));
+    try {
+      setEquipment(await admin.getEquipmentByFacility(facilityId));
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
+  const handleEquipmentStatus = async (itemId, status) => {
+    try {
+      await admin.updateEquipmentStatus(itemId, status);
+      showMessage('success', 'Equipment status updated successfully.');
+      if (selectedFacilityId) {
+        setEquipment(await admin.getEquipmentByFacility(Number(selectedFacilityId)));
+      }
     } catch (error) {
       showMessage('error', error.message);
     }
@@ -318,6 +419,10 @@ function AdminDashboard() {
                 <input name="email" type="email" value={admissionForm.email} onChange={updateAdmission} required />
               </label>
               <label>
+                Contact
+                <input name="contact" value={admissionForm.contact} onChange={updateAdmission} placeholder="Phone or emergency contact" />
+              </label>
+              <label>
                 Username
                 <input name="username" value={admissionForm.username} onChange={updateAdmission} required />
               </label>
@@ -363,6 +468,10 @@ function AdminDashboard() {
                 <article className="stat-card"><span>Total Invoices</span><strong>{analytics?.totalInvoices ?? 0}</strong></article>
                 <article className="stat-card"><span>Pending Invoices</span><strong>{analytics?.pendingInvoices ?? 0}</strong></article>
                 <article className="stat-card"><span>Total Revenue</span><strong>{formatCurrency(analytics?.totalRevenue ?? 0)}</strong></article>
+                <article className="stat-card"><span>Completed Sessions</span><strong>{analytics?.completedSessions ?? 0}</strong></article>
+                <article className="stat-card"><span>Cancelled Sessions</span><strong>{analytics?.cancelledSessions ?? 0}</strong></article>
+                <article className="stat-card"><span>Scheduled Sessions</span><strong>{analytics?.scheduledSessions ?? 0}</strong></article>
+                <article className="stat-card"><span>Available Facilities</span><strong>{analytics?.availableFacilities ?? 0}</strong></article>
               </div>
             </div>
 
@@ -407,8 +516,15 @@ function AdminDashboard() {
           <section className="section section-stack">
             <form className="panel form-grid" onSubmit={handleBilling}>
               <label>
-                Session ID
-                <input name="sessionId" type="number" min="1" value={billingForm.sessionId} onChange={updateBilling} required />
+                Completed Session
+                <select name="sessionId" value={billingForm.sessionId} onChange={updateBilling} required>
+                  <option value="">Choose completed session</option>
+                  {getSessionsForAthlete(completedSessions, athletes, billingForm.athleteName).map((session) => (
+                    <option value={session.sessionId} key={session.sessionId}>
+                      {formatSessionOption(session, athletes)}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Athlete Name
@@ -455,6 +571,10 @@ function AdminDashboard() {
                 <input name="email" type="email" value={staffForm.email} onChange={updateStaff} required />
               </label>
               <label>
+                Contact
+                <input name="contact" value={staffForm.contact} onChange={updateStaff} placeholder="Phone or staff contact" />
+              </label>
+              <label>
                 Username
                 <input name="username" value={staffForm.username} onChange={updateStaff} required />
               </label>
@@ -472,10 +592,85 @@ function AdminDashboard() {
               <button className="btn-primary compact" type="submit">Add Staff</button>
             </form>
 
-            <form className="panel form-inline" onSubmit={handleDeactivateStaff}>
-              <input type="number" min="1" placeholder="Staff user ID" value={deactivateId} onChange={(event) => setDeactivateId(event.target.value)} required />
-              <button className="btn-danger" type="submit">Deactivate Staff</button>
-            </form>
+            {editingStaff && (
+              <form className="panel form-grid" onSubmit={handleUpdateStaff}>
+                <label>
+                  Full Name
+                  <input name="fullName" value={editingStaff.fullName} onChange={updateEditingStaff} required />
+                </label>
+                <label>
+                  Email
+                  <input name="email" type="email" value={editingStaff.email} onChange={updateEditingStaff} required />
+                </label>
+                <label>
+                  Contact
+                  <input name="contact" value={editingStaff.contact} onChange={updateEditingStaff} />
+                </label>
+                {editingStaff.role === 'THERAPIST' && (
+                  <>
+                    <label>
+                      Specialization
+                      <input name="specialization" value={editingStaff.specialization} onChange={updateEditingStaff} />
+                    </label>
+                    <label>
+                      License Number
+                      <input name="licenseNumber" value={editingStaff.licenseNumber} onChange={updateEditingStaff} />
+                    </label>
+                  </>
+                )}
+                <div className="card-actions">
+                  <button className="btn-primary compact" type="submit">Save Staff</button>
+                  <button className="btn-secondary" type="button" onClick={() => setEditingStaff(null)}>Cancel</button>
+                </div>
+              </form>
+            )}
+
+            <div className="panel">
+              <div className="panel-header">
+                <h2>Staff Directory</h2>
+                <span>{staff.length}</span>
+              </div>
+              {staff.length === 0 ? (
+                <p className="empty-state">No staff accounts found.</p>
+              ) : (
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Staff</th>
+                        <th>Role</th>
+                        <th>Email</th>
+                        <th>Contact</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staff.map((staffMember) => (
+                        <tr key={staffMember.userId}>
+                          <td>{staffMember.fullname || staffMember.fullName || staffMember.username}</td>
+                          <td>{staffMember.role}</td>
+                          <td>{staffMember.email}</td>
+                          <td>{staffMember.contact || '-'}</td>
+                          <td>{staffMember.active === false || staffMember.isActive === false ? 'Inactive' : 'Active'}</td>
+                          <td>
+                            {staffMember.userId === user.userId ? (
+                              <span className="muted-text">Current admin</span>
+                            ) : (
+                              <>
+                                <button className="btn-secondary" type="button" onClick={() => startEditStaff(staffMember)}>Edit</button>
+                                <button className="btn-secondary" type="button" onClick={() => handleDeactivateStaff(staffMember.userId)}>Deactivate</button>
+                                <button className="btn-danger" type="button" onClick={() => handleDeleteStaff(staffMember.userId)}>Delete</button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </section>
         )}
 
@@ -496,10 +691,39 @@ function AdminDashboard() {
                     <p>Facility #{facility.facilityId ?? facility.id}</p>
                     <p>{facility.type}</p>
                     {facility.location && <p>{facility.location}</p>}
-                    <p>Used by admission and booking forms.</p>
+                    <div className="card-actions">
+                      <button className="btn-secondary" type="button" onClick={() => handleFacilityStatus(facility.facilityId ?? facility.id, 'AVAILABLE')}>Available</button>
+                      <button className="btn-secondary" type="button" onClick={() => handleFacilityStatus(facility.facilityId ?? facility.id, 'RESERVED')}>Reserve</button>
+                      <button className="btn-danger" type="button" onClick={() => handleFacilityStatus(facility.facilityId ?? facility.id, 'MAINTENANCE')}>Maintenance</button>
+                    </div>
+                    <button className="btn-secondary" type="button" onClick={() => handleLoadEquipment(facility.facilityId ?? facility.id)}>View Equipment</button>
                   </article>
                 ))}
               </div>
+              <div className="panel-header">
+                <h2>Equipment</h2>
+                <span>{equipment.length}</span>
+              </div>
+              {equipment.length === 0 ? (
+                <p className="empty-state">Select a facility to view equipment.</p>
+              ) : (
+                <div className="card-grid">
+                  {equipment.map((item) => (
+                    <article className="card" key={item.itemId ?? item.equipmentId}>
+                      <div className="card-topline">
+                        <h3>{item.itemName || item.name}</h3>
+                        <span className={statusClass(item.itemStatus || item.status)}>{item.itemStatus || item.status}</span>
+                      </div>
+                      <p>Quantity: {item.itemQuantity ?? '-'}</p>
+                      <div className="card-actions">
+                        <button className="btn-secondary" type="button" onClick={() => handleEquipmentStatus(item.itemId ?? item.equipmentId, 'AVAILABLE')}>Available</button>
+                        <button className="btn-secondary" type="button" onClick={() => handleEquipmentStatus(item.itemId ?? item.equipmentId, 'IN_USE')}>In Use</button>
+                        <button className="btn-danger" type="button" onClick={() => handleEquipmentStatus(item.itemId ?? item.equipmentId, 'MAINTENANCE')}>Maintenance</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -588,6 +812,20 @@ function findAthleteByName(athletes, typedName) {
     const username = normalizeName(athlete.username);
     return needle === fullLabel || needle === fullname || needle === username;
   }) || null;
+}
+
+function getSessionsForAthlete(sessions, athletes, typedName) {
+  if (!normalizeName(typedName)) return [];
+  const selectedAthlete = findAthleteByName(athletes, typedName);
+  if (!selectedAthlete) return [];
+  return sessions.filter((session) =>
+    session.athleteId === selectedAthlete.athleteId);
+}
+
+function formatSessionOption(session, athletes) {
+  const athlete = athletes.find((item) => item.athleteId === session.athleteId);
+  const athleteName = athlete ? formatAthleteName(athlete) : 'Athlete record';
+  return `${athleteName} - ${session.sessionType || 'Session'} - ${formatDateTime(session.sessionDate)}`;
 }
 
 export default AdminDashboard;

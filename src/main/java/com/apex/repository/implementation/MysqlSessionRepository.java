@@ -72,6 +72,12 @@ public class MysqlSessionRepository implements SessionRepository {
     }
 
     @Override
+    public List<Session> findAll() {
+        String sql = "SELECT * FROM sessions ORDER BY scheduled_date DESC";
+        return jdbc.query(sql, this::mapRow);
+    }
+
+    @Override
     public List<Session> findByAthleteId(int athleteId) {
         String sql = "SELECT * FROM sessions WHERE athlete_id = ? " +
                 "ORDER BY scheduled_date DESC";

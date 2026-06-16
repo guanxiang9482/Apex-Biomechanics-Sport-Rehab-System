@@ -1,50 +1,36 @@
 package com.apex.config;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
 /**
- * Singleton Pattern Implementation
- * Manages the global lifecycle of the MySQL JDBC connection.
- * Uses Bill Pugh's static inner Holder class for thread-safe
- * lazy initialization without synchronization overhead.
+ * Singleton Pattern Implementation.
  *
- * Note: In Spring Boot context, JdbcTemplate uses the DataSource
- * configured in application.properties for repository operations.
- * This Singleton demonstrates the pattern explicitly as required
- * by the proposal, and can be used for raw JDBC operations.
+ * Spring Boot repositories use JdbcTemplate and the configured DataSource
+ * for normal application work. This class keeps an explicit Singleton
+ * example for the proposal and for rare raw JDBC usage.
  */
-@Component
 public class DBConnection {
 
-    @Value("${spring.datasource.url}")
-    private String jdbcUrl;
-
-    @Value("${spring.datasource.username}")
-    private String username;
-
-    @Value("${spring.datasource.password}")
-    private String password;
-
-    // Private constructor — prevents external instantiation
     private DBConnection() {}
 
-    // Bill Pugh Singleton — thread-safe without synchronized keyword
     private static class Holder {
         private static final DBConnection INSTANCE = new DBConnection();
     }
 
-    // Global access point
     public static DBConnection getInstance() {
         return Holder.INSTANCE;
     }
 
-    // Provides a raw JDBC connection for direct use
     public Connection getConnection() throws SQLException {
+        String jdbcUrl = System.getProperty(
+                "spring.datasource.url",
+                "jdbc:mysql://localhost:3306/apex_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kuala_Lumpur");
+        String username = System.getProperty(
+                "spring.datasource.username", "root");
+        String password = System.getProperty(
+                "spring.datasource.password", "031216Low");
         return DriverManager.getConnection(jdbcUrl, username, password);
     }
 }

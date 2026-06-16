@@ -14,6 +14,8 @@ public interface UserRepository {
     boolean existsByEmail(String email);
     void updatePassword(int userId, String newPasswordHash);
     void updateLastLoginAt(int userId);
+    void updateStaffInfo(int userId, String email, String fullname,
+                         String contact);
     void setActiveStatus(int userId, boolean isActive);
     void delete(int userId);
     List<User> findAllStaff();

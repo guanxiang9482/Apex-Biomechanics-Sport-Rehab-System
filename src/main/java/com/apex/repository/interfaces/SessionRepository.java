@@ -11,6 +11,7 @@ import com.apex.domain.SessionStatus;
 public interface SessionRepository {
     void save(Session session);
     Optional<Session> findById(int sessionId);
+    List<Session> findAll();
     List<Session> findByAthleteId(int athleteId);
     List<Session> findByTherapistId(int therapistId);
     List<Session> findByDate(LocalDate date);

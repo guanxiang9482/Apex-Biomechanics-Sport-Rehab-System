@@ -82,4 +82,12 @@ public class MysqlPhysiotherapistRepository implements PhysiotherapistRepository
                 """;
         return jdbc.query(sql, this::mapRow);
     }
+
+    @Override
+    public void updateProfessionalInfo(int userId, String specialization,
+                                       String licenseNumber) {
+        jdbc.update("UPDATE physiotherapists SET specialization = ?, " +
+                        "license_number = ? WHERE user_id = ?",
+                specialization, licenseNumber, userId);
+    }
 }

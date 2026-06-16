@@ -48,7 +48,10 @@ public class AthleteController {
     // UC6 — Get profile by athleteId
     @GetMapping("/{athleteId}/profile")
     public ResponseEntity<?> getProfile(
-            @PathVariable int athleteId) {
+            @PathVariable int athleteId,
+            @RequestHeader("X-User-Id") int userId) {
+        ResponseEntity<?> accessError = requireOwnedAthlete(userId, athleteId);
+        if (accessError != null) return accessError;
         Optional<Athlete> athlete =
                 profileService.getProfile(athleteId);
         return athlete.map(ResponseEntity::ok)
@@ -58,7 +61,12 @@ public class AthleteController {
     // UC6 — Get profile by userId (used after login)
     @GetMapping("/user/{userId}/profile")
     public ResponseEntity<?> getProfileByUserId(
-            @PathVariable int userId) {
+            @PathVariable int userId,
+            @RequestHeader("X-User-Id") int requestUserId) {
+        if (userId != requestUserId) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", "You can only access your own profile."));
+        }
         Optional<Athlete> athlete =
                 profileService.getProfileByUserId(userId);
         return athlete.map(ResponseEntity::ok)
@@ -69,7 +77,10 @@ public class AthleteController {
     @PutMapping("/{athleteId}/profile")
     public ResponseEntity<?> updateProfile(
             @PathVariable int athleteId,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body,
+            @RequestHeader("X-User-Id") int userId) {
+        ResponseEntity<?> accessError = requireOwnedAthlete(userId, athleteId);
+        if (accessError != null) return accessError;
         Optional<Athlete> athleteOpt =
                 profileService.getProfile(athleteId);
         if (athleteOpt.isEmpty())
@@ -99,9 +110,27 @@ public class AthleteController {
 
     // UC5 — Today's sessions
     @GetMapping("/sessions/today")
-    public ResponseEntity<List<Session>> getTodaySessions() {
+    public ResponseEntity<?> getTodaySessions(
+            @RequestHeader("X-User-Id") int userId) {
+        Optional<Athlete> athlete =
+                profileService.getProfileByUserId(userId);
+        if (athlete.isEmpty()) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", "Athlete profile not found for this user."));
+        }
         return ResponseEntity.ok(
-                sessionService.getTodaySessions());
+                sessionService.getTodaySessionsForAthlete(
+                        athlete.get().getAthleteId()));
+    }
+
+    @GetMapping("/{athleteId}/sessions/today")
+    public ResponseEntity<?> getTodaySessionsForAthlete(
+            @PathVariable int athleteId,
+            @RequestHeader("X-User-Id") int userId) {
+        ResponseEntity<?> accessError = requireOwnedAthlete(userId, athleteId);
+        if (accessError != null) return accessError;
+        return ResponseEntity.ok(
+                sessionService.getTodaySessionsForAthlete(athleteId));
     }
 
     @GetMapping("/therapists")
@@ -121,15 +150,16 @@ public class AthleteController {
             @RequestParam int therapistId,
             @RequestParam int facilityId,
             @RequestParam String date,
-            @RequestParam(defaultValue = "60") int durationMins) {
+            @RequestParam(defaultValue = "60") int durationMins,
+            @RequestParam(required = false) Integer currentSessionId) {
         try {
             return ResponseEntity.ok(Map.of(
                     "availableSlots",
                     sessionService.getAvailableSlots(
-                            therapistId, facilityId,
-                            LocalDate.parse(date), durationMins)
+                            therapistId, facilityId, LocalDate.parse(date),
+                            durationMins, currentSessionId)
             ));
-        } catch (IllegalArgumentException e) {
+        } catch (RuntimeException e) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", e.getMessage()));
         }
@@ -138,7 +168,8 @@ public class AthleteController {
     // UC7 — Book session
     @PostMapping("/sessions/book")
     public ResponseEntity<?> bookSession(
-            @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body,
+            @RequestHeader("X-User-Id") int userId) {
         try {
             int athleteId   = (Integer) body.get("athleteId");
             int therapistId = (Integer) body.get("therapistId");
@@ -147,6 +178,9 @@ public class AthleteController {
             int duration    = body.containsKey("durationMins")
                     ? (Integer) body.get("durationMins") : 60;
             String type     = (String) body.get("sessionType");
+            ResponseEntity<?> accessError =
+                    requireOwnedAthlete(userId, athleteId);
+            if (accessError != null) return accessError;
 
             Session session = sessionService.bookSession(
                     athleteId, therapistId, facilityId,
@@ -164,16 +198,22 @@ public class AthleteController {
 
     // UC8 — Session history
     @GetMapping("/{athleteId}/sessions/history")
-    public ResponseEntity<List<Session>> getSessionHistory(
-            @PathVariable int athleteId) {
+    public ResponseEntity<?> getSessionHistory(
+            @PathVariable int athleteId,
+            @RequestHeader("X-User-Id") int userId) {
+        ResponseEntity<?> accessError = requireOwnedAthlete(userId, athleteId);
+        if (accessError != null) return accessError;
         return ResponseEntity.ok(
                 sessionService.getSessionHistory(athleteId));
     }
 
     // UC9 — Upcoming sessions
     @GetMapping("/{athleteId}/sessions/upcoming")
-    public ResponseEntity<List<Session>> getUpcomingSessions(
-            @PathVariable int athleteId) {
+    public ResponseEntity<?> getUpcomingSessions(
+            @PathVariable int athleteId,
+            @RequestHeader("X-User-Id") int userId) {
+        ResponseEntity<?> accessError = requireOwnedAthlete(userId, athleteId);
+        if (accessError != null) return accessError;
         return ResponseEntity.ok(
                 sessionService.getUpcomingSessions(athleteId));
     }
@@ -181,36 +221,75 @@ public class AthleteController {
     // UC9 — Cancel session
     @PutMapping("/sessions/{sessionId}/cancel")
     public ResponseEntity<?> cancelSession(
-            @PathVariable int sessionId) {
-        sessionService.cancelSession(sessionId);
-        return ResponseEntity.ok(Map.of(
-                "message", "Session cancelled successfully"));
+            @PathVariable int sessionId,
+            @RequestBody Map<String, Object> body,
+            @RequestHeader("X-User-Id") int userId) {
+        try {
+            int athleteId = (Integer) body.get("athleteId");
+            ResponseEntity<?> accessError =
+                    requireOwnedAthlete(userId, athleteId);
+            if (accessError != null) return accessError;
+            sessionService.cancelSessionForAthlete(sessionId, athleteId);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Session cancelled successfully"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 
     // UC9 — Reschedule session
     @PutMapping("/sessions/{sessionId}/reschedule")
     public ResponseEntity<?> rescheduleSession(
             @PathVariable int sessionId,
-            @RequestBody Map<String, String> body) {
-        sessionService.rescheduleSession(sessionId,
-                LocalDateTime.parse(body.get("newDate")));
-        return ResponseEntity.ok(Map.of(
-                "message", "Session rescheduled successfully"));
+            @RequestBody Map<String, Object> body,
+            @RequestHeader("X-User-Id") int userId) {
+        try {
+            int athleteId = (Integer) body.get("athleteId");
+            ResponseEntity<?> accessError =
+                    requireOwnedAthlete(userId, athleteId);
+            if (accessError != null) return accessError;
+            sessionService.rescheduleSessionForAthlete(sessionId, athleteId,
+                    LocalDateTime.parse((String) body.get("newDate")));
+            return ResponseEntity.ok(Map.of(
+                    "message", "Session rescheduled successfully"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 
     // UC10 — Recovery metrics
     @GetMapping("/{athleteId}/recovery-metrics")
-    public ResponseEntity<List<BiomechanicalRecord>>
-    getRecoveryMetrics(@PathVariable int athleteId) {
+    public ResponseEntity<?> getRecoveryMetrics(
+            @PathVariable int athleteId,
+            @RequestHeader("X-User-Id") int userId) {
+        ResponseEntity<?> accessError = requireOwnedAthlete(userId, athleteId);
+        if (accessError != null) return accessError;
         return ResponseEntity.ok(
                 biomechanicsRepository.findByAthleteId(athleteId));
     }
 
     // UC20 — Own invoices
     @GetMapping("/{athleteId}/invoices")
-    public ResponseEntity<List<Invoice>> getMyInvoices(
-            @PathVariable int athleteId) {
+    public ResponseEntity<?> getMyInvoices(
+            @PathVariable int athleteId,
+            @RequestHeader("X-User-Id") int userId) {
+        ResponseEntity<?> accessError = requireOwnedAthlete(userId, athleteId);
+        if (accessError != null) return accessError;
         return ResponseEntity.ok(
                 paymentService.getAthleteInvoices(athleteId));
+    }
+
+    private ResponseEntity<?> requireOwnedAthlete(int userId, int athleteId) {
+        Optional<Athlete> requester =
+                profileService.getProfileByUserId(userId);
+        if (requester.isEmpty()
+                || requester.get().getAthleteId() != athleteId) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error",
+                    "You can only access your own athlete records."));
+        }
+        return null;
     }
 }

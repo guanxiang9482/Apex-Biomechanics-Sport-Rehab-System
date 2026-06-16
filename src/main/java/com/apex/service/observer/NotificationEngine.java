@@ -61,11 +61,9 @@ public class NotificationEngine {
         observers.stream()
                 .filter(o -> o.getObserverId() == observerId)
                 .findFirst()
-                .ifPresent(o -> {
-                    o.update(event);
-                    notificationRepository.save(
-                            new NotificationLog(observerId, event));
-                });
+                .ifPresent(o -> o.update(event));
+        notificationRepository.save(
+                new NotificationLog(observerId, event));
     }
 
     public List<String> getEventLog()  { return eventLog; }

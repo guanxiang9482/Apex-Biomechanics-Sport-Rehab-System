@@ -56,14 +56,14 @@ export const athlete = {
     request(`/athlete/user/${userId}/profile`),
   updateProfile: (athleteId, profileData) =>
     request(`/athlete/${athleteId}/profile`, 'PUT', profileData),
-  getTodaySessions: () =>
-    request('/athlete/sessions/today'),
+  getTodaySessions: (athleteId) =>
+    request(`/athlete/${athleteId}/sessions/today`),
   getTherapists: () =>
     request('/athlete/therapists'),
   getFacilities: () =>
     request('/athlete/facilities'),
-  getAvailableSlots: (therapistId, facilityId, date, durationMins) =>
-    request(`/athlete/sessions/availability?therapistId=${therapistId}&facilityId=${facilityId}&date=${date}&durationMins=${durationMins}`),
+  getAvailableSlots: (therapistId, facilityId, date, durationMins, currentSessionId = null) =>
+    request(`/athlete/sessions/availability?therapistId=${therapistId}&facilityId=${facilityId}&date=${date}&durationMins=${durationMins}${currentSessionId ? `&currentSessionId=${currentSessionId}` : ''}`),
   bookSession: (athleteId, therapistId, facilityId, sessionDate, durationMins, sessionType) =>
     request('/athlete/sessions/book', 'POST', {
       athleteId, therapistId, facilityId, sessionDate, durationMins, sessionType,
@@ -72,10 +72,10 @@ export const athlete = {
     request(`/athlete/${athleteId}/sessions/history`),
   getUpcomingSessions: (athleteId) =>
     request(`/athlete/${athleteId}/sessions/upcoming`),
-  cancelSession: (sessionId) =>
-    request(`/athlete/sessions/${sessionId}/cancel`, 'PUT'),
-  rescheduleSession: (sessionId, newDate) =>
-    request(`/athlete/sessions/${sessionId}/reschedule`, 'PUT', { newDate }),
+  cancelSession: (sessionId, athleteId) =>
+    request(`/athlete/sessions/${sessionId}/cancel`, 'PUT', { athleteId }),
+  rescheduleSession: (sessionId, athleteId, newDate) =>
+    request(`/athlete/sessions/${sessionId}/reschedule`, 'PUT', { athleteId, newDate }),
   getRecoveryMetrics: (athleteId) =>
     request(`/athlete/${athleteId}/recovery-metrics`),
   getInvoices: (athleteId) =>
@@ -87,6 +87,10 @@ export const therapist = {
     request(`/therapist/user/${userId}/profile`),
   getAthletes: () =>
     request('/therapist/athletes'),
+  getAssignedAthletes: (therapistId) =>
+    request(`/therapist/${therapistId}/athletes`),
+  getSessions: (therapistId) =>
+    request(`/therapist/${therapistId}/sessions`),
   getTodayRoster: (therapistId) =>
     request(`/therapist/${therapistId}/roster/today`),
   logBiomechanicalData: (athleteId, therapistId, sessionId, jumpPower, jointMobility, postureScore, treatmentNote) =>
@@ -95,8 +99,8 @@ export const therapist = {
     }),
   getBiomechanicalsBySession: (sessionId) =>
     request(`/therapist/biomechanics/session/${sessionId}`),
-  updateSessionStatus: (sessionId, status) =>
-    request(`/therapist/sessions/${sessionId}/status`, 'PUT', { status }),
+  updateSessionStatus: (sessionId, therapistId, status) =>
+    request(`/therapist/sessions/${sessionId}/status`, 'PUT', { therapistId: String(therapistId), status }),
   compileAthleteReport: (athleteId) =>
     request(`/therapist/reports/athlete/${athleteId}/compile`),
   generateReport: (athleteId, therapistId, reportType, description) =>
@@ -108,9 +112,9 @@ export const therapist = {
 };
 
 export const admin = {
-  admitNewAthlete: (username, password, email, fullName, therapistId, facilityId) =>
+  admitNewAthlete: (username, password, email, fullName, contact, therapistId, facilityId) =>
     request('/admin/athletes/admit', 'POST', {
-      username, password, email, fullName, therapistId, facilityId,
+      username, password, email, fullName, contact, therapistId, facilityId,
     }),
   getAnalytics: () =>
     request('/admin/analytics'),
@@ -120,6 +124,8 @@ export const admin = {
     request('/admin/facilities'),
   getTherapists: () =>
     request('/admin/therapists'),
+  getCompletedSessions: () =>
+    request('/admin/sessions/completed'),
   updateFacilityStatus: (facilityId, status) =>
     request(`/admin/facilities/${facilityId}/status`, 'PUT', { status }),
   getEquipmentByFacility: (facilityId) =>
@@ -128,14 +134,20 @@ export const admin = {
     request(`/admin/equipment/${itemId}/status`, 'PUT', { status }),
   processBilling: (sessionId, athleteId, billingType) =>
     request('/admin/billing/process', 'POST', { sessionId, athleteId, billingType }),
-  addStaff: (username, password, email, fullName, role) =>
-    request('/admin/staff/add', 'POST', { username, password, email, fullName, role }),
+  getAllStaff: () =>
+    request('/admin/staff'),
+  addStaff: (username, password, email, fullName, contact, role) =>
+    request('/admin/staff/add', 'POST', { username, password, email, fullName, contact, role }),
+  updateStaff: (userId, staffData) =>
+    request(`/admin/staff/${userId}`, 'PUT', staffData),
   deactivateStaff: (userId) =>
     request(`/admin/staff/${userId}/deactivate`, 'PUT'),
   deleteStaff: (userId) =>
     request(`/admin/staff/${userId}`, 'DELETE'),
   getFullLedger: () =>
     request('/admin/ledger'),
+  approveReport: (reportId, adminId) =>
+    request(`/admin/reports/${reportId}/approve`, 'PUT', { adminId }),
 };
 
 export const notifications = {
@@ -145,4 +157,6 @@ export const notifications = {
     request(`/notifications/${userId}/all`),
   markAsRead: (notificationId) =>
     request(`/notifications/${notificationId}/read`, 'PUT'),
+  markAllAsRead: (userId) =>
+    request(`/notifications/user/${userId}/read-all`, 'PUT'),
 };

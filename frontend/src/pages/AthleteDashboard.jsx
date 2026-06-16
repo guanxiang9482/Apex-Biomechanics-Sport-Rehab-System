@@ -37,10 +37,12 @@ function AthleteDashboard() {
   const [facilities, setFacilities] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [rescheduleSlots, setRescheduleSlots] = useState([]);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [noticeList, setNoticeList] = useState([]);
   const [profileForm, setProfileForm] = useState(initialProfile);
   const [bookingForm, setBookingForm] = useState(initialBooking);
-  const [reschedule, setReschedule] = useState({ sessionId: '', newDate: '' });
+  const [reschedule, setReschedule] = useState({ sessionId: '', sessionDay: '', newDate: '' });
 
   const showMessage = (type, text) => setMessage({ type, text });
 
@@ -59,7 +61,7 @@ function AthleteDashboard() {
 
       const athleteId = profile.athleteId;
       const [today, upcoming, history, recoveryMetrics, athleteInvoices] = await Promise.all([
-        athlete.getTodaySessions(),
+        athlete.getTodaySessions(athleteId),
         athlete.getUpcomingSessions(athleteId),
         athlete.getSessionHistory(athleteId),
         athlete.getRecoveryMetrics(athleteId),
@@ -69,7 +71,7 @@ function AthleteDashboard() {
       setAthleteProfile(profile);
       setTherapists(therapistData);
       setFacilities(facilityData);
-      setTodaySessions(today.filter((session) => session.athleteId === athleteId));
+      setTodaySessions(today);
       setUpcomingSessions(upcoming);
       setSessionHistory(history);
       setMetrics(recoveryMetrics);
@@ -118,9 +120,9 @@ function AthleteDashboard() {
     setBookingForm((current) => ({
       ...current,
       [name]: value,
-      sessionDate: ['therapistId', 'facilityId', 'sessionDay', 'durationMins'].includes(name)
-        ? ''
-        : current.sessionDate,
+      ...(['therapistId', 'facilityId', 'sessionDay', 'durationMins'].includes(name)
+        ? { sessionDate: '' }
+        : {}),
     }));
   };
 
@@ -162,6 +164,47 @@ function AthleteDashboard() {
     return () => window.clearTimeout(timer);
   }, [loadAvailableSlots]);
 
+  const loadRescheduleSlots = useCallback(async () => {
+    if (!reschedule.sessionId || !reschedule.sessionDay) {
+      setRescheduleSlots([]);
+      return;
+    }
+
+    const selectedSession = upcomingSessions.find((session) =>
+      session.sessionId === Number(reschedule.sessionId));
+    if (!selectedSession) {
+      setRescheduleSlots([]);
+      return;
+    }
+
+    setRescheduleLoading(true);
+    try {
+      const result = await athlete.getAvailableSlots(
+        selectedSession.therapistId,
+        selectedSession.facilityId,
+        reschedule.sessionDay,
+        selectedSession.durationMins || 60,
+        selectedSession.sessionId,
+      );
+      const slots = result.availableSlots || [];
+      setRescheduleSlots(slots);
+      setReschedule((current) => ({
+        ...current,
+        newDate: slots.includes(current.newDate) ? current.newDate : (slots[0] || ''),
+      }));
+    } catch (error) {
+      setRescheduleSlots([]);
+      showMessage('error', error.message);
+    } finally {
+      setRescheduleLoading(false);
+    }
+  }, [reschedule.sessionDay, reschedule.sessionId, upcomingSessions]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(loadRescheduleSlots, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadRescheduleSlots]);
+
   const handleBookSession = async (event) => {
     event.preventDefault();
     if (!athleteProfile?.athleteId) {
@@ -186,8 +229,12 @@ function AthleteDashboard() {
   };
 
   const handleCancelSession = async (sessionId) => {
+    if (!athleteProfile?.athleteId) {
+      showMessage('error', 'Athlete profile is still loading. Please try again.');
+      return;
+    }
     try {
-      await athlete.cancelSession(sessionId);
+      await athlete.cancelSession(sessionId, athleteProfile.athleteId);
       showMessage('success', 'Session cancelled successfully.');
       await loadDashboard();
     } catch (error) {
@@ -197,9 +244,13 @@ function AthleteDashboard() {
 
   const handleReschedule = async (event) => {
     event.preventDefault();
+    if (!athleteProfile?.athleteId) {
+      showMessage('error', 'Athlete profile is still loading. Please try again.');
+      return;
+    }
     try {
-      await athlete.rescheduleSession(Number(reschedule.sessionId), reschedule.newDate);
-      setReschedule({ sessionId: '', newDate: '' });
+      await athlete.rescheduleSession(Number(reschedule.sessionId), athleteProfile.athleteId, reschedule.newDate);
+      setReschedule({ sessionId: '', sessionDay: '', newDate: '' });
       showMessage('success', 'Session rescheduled successfully.');
       await loadDashboard();
     } catch (error) {
@@ -407,7 +458,7 @@ function AthleteDashboard() {
                   <h2>Upcoming Sessions</h2>
                   <span>{upcomingSessions.length}</span>
                 </div>
-                <SessionCards sessions={upcomingSessions} therapists={therapists} facilities={facilities} onCancel={handleCancelSession} onPickReschedule={(sessionId) => setReschedule((current) => ({ ...current, sessionId: String(sessionId) }))} />
+                <SessionCards sessions={upcomingSessions} therapists={therapists} facilities={facilities} onCancel={handleCancelSession} onPickReschedule={(sessionId) => setReschedule((current) => ({ ...current, sessionId: String(sessionId), sessionDay: '', newDate: '' }))} />
               </div>
               <div className="panel">
                 <div className="panel-header">
@@ -416,15 +467,34 @@ function AthleteDashboard() {
                 </div>
                 <form className="form-grid single-column" onSubmit={handleReschedule}>
                   <label>
-                    Session ID
-                    <input type="number" min="1" value={reschedule.sessionId} onChange={(event) => setReschedule((current) => ({ ...current, sessionId: event.target.value }))} required />
+                    Session
+                    <select value={reschedule.sessionId} onChange={(event) => setReschedule((current) => ({ ...current, sessionId: event.target.value, sessionDay: '', newDate: '' }))} required>
+                      <option value="">Choose session</option>
+                      {upcomingSessions.map((session) => (
+                        <option value={session.sessionId} key={session.sessionId}>
+                          {session.sessionType || 'Rehab Session'} - {formatDateTime(session.sessionDate)}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label>
-                    New Date
-                    <input type="datetime-local" value={reschedule.newDate} onChange={(event) => setReschedule((current) => ({ ...current, newDate: event.target.value }))} required />
+                    New Day
+                    <input type="date" value={reschedule.sessionDay} onChange={(event) => setReschedule((current) => ({ ...current, sessionDay: event.target.value, newDate: '' }))} required />
                   </label>
-                  <button className="btn-primary compact" type="submit">Save New Date</button>
+                  <label>
+                    Available Time
+                    <select value={reschedule.newDate} onChange={(event) => setReschedule((current) => ({ ...current, newDate: event.target.value }))} required>
+                      <option value="">{rescheduleLoading ? 'Checking times...' : 'Choose time'}</option>
+                      {rescheduleSlots.map((slot) => (
+                        <option value={slot} key={slot}>{formatDateTime(slot)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="btn-primary compact" type="submit" disabled={!reschedule.newDate}>Save New Date</button>
                 </form>
+                {reschedule.sessionDay && !rescheduleLoading && rescheduleSlots.length === 0 && (
+                  <p className="empty-state">No available times for this session. Try another day.</p>
+                )}
               </div>
             </div>
 

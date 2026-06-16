@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.*;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class MysqlNotificationRepository
@@ -46,6 +47,15 @@ public class MysqlNotificationRepository
         if (keyHolder.getKey() != null) {
             notification.setNotifId(keyHolder.getKey().intValue());
         }
+    }
+
+    @Override
+    public Optional<NotificationLog> findById(int notifId) {
+        String sql = "SELECT * FROM notifications_log " +
+                "WHERE notif_id = ?";
+        var results = jdbc.query(sql, this::mapRow, notifId);
+        return results.isEmpty() ? Optional.empty()
+                : Optional.of(results.get(0));
     }
 
     @Override

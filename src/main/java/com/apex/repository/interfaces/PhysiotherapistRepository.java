@@ -9,4 +9,6 @@ public interface PhysiotherapistRepository {
     Optional<Physiotherapist> findById(int therapistId);
     Optional<Physiotherapist> findByUserId(int userId);
     List<Physiotherapist> findAll();
+    void updateProfessionalInfo(int userId, String specialization,
+                                String licenseNumber);
 }

@@ -26,6 +26,7 @@ function TherapistDashboard() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [roster, setRoster] = useState([]);
+  const [sessionList, setSessionList] = useState([]);
   const [records, setRecords] = useState([]);
   const [reports, setReports] = useState([]);
   const [therapistProfile, setTherapistProfile] = useState(null);
@@ -44,13 +45,15 @@ function TherapistDashboard() {
 
     try {
       const profile = await therapist.getProfileByUserId(user.userId);
-      const [todayRoster, athleteData, userNotifications] = await Promise.all([
+      const [todayRoster, sessionData, athleteData, userNotifications] = await Promise.all([
         therapist.getTodayRoster(profile.therapistId),
-        therapist.getAthletes(),
+        therapist.getSessions(profile.therapistId),
+        therapist.getAssignedAthletes(profile.therapistId),
         notifications.getAll(user.userId),
       ]);
       setTherapistProfile(profile);
       setRoster(todayRoster);
+      setSessionList(sessionData);
       setAthletes(athleteData);
       setNoticeList(userNotifications);
     } catch (error) {
@@ -94,8 +97,12 @@ function TherapistDashboard() {
   };
 
   const handleStatusUpdate = async (sessionId, status) => {
+    if (!therapistProfile?.therapistId) {
+      showMessage('error', 'Therapist profile is still loading. Please try again.');
+      return;
+    }
     try {
-      await therapist.updateSessionStatus(sessionId, status);
+      await therapist.updateSessionStatus(sessionId, therapistProfile.therapistId, status);
       showMessage('success', `Session status updated to ${status}.`);
       await loadDashboard();
     } catch (error) {
@@ -288,7 +295,7 @@ function TherapistDashboard() {
 
         {activeSection === 'biomechanics' && (
           <section className="section section-stack">
-            <form className="panel form-grid" onSubmit={handleMetricSubmit}>
+              <form className="panel form-grid" onSubmit={handleMetricSubmit}>
               <label>
                 Athlete Name
                 <input name="athleteName" list="therapist-athletes" value={metricForm.athleteName} onChange={updateMetricForm} placeholder="Start typing athlete name" required />
@@ -297,7 +304,7 @@ function TherapistDashboard() {
                 Session
                 <select name="sessionId" value={metricForm.sessionId} onChange={updateMetricForm} required>
                   <option value="">Choose session</option>
-                  {getSessionsForAthlete(roster, athletes, metricForm.athleteName).map((session) => (
+                  {getSessionsForAthlete(sessionList, athletes, metricForm.athleteName).map((session) => (
                     <option value={session.sessionId} key={session.sessionId}>
                       {formatSessionOption(session, athletes)}
                     </option>
@@ -329,7 +336,14 @@ function TherapistDashboard() {
                 <span>UC12</span>
               </div>
               <form className="form-inline" onSubmit={handleRecordLookup}>
-                <input type="number" min="1" placeholder="Session ID" value={recordLookupId} onChange={(event) => setRecordLookupId(event.target.value)} required />
+                <select value={recordLookupId} onChange={(event) => setRecordLookupId(event.target.value)} required>
+                  <option value="">Choose session</option>
+                  {sessionList.map((session) => (
+                    <option value={session.sessionId} key={session.sessionId}>
+                      {formatSessionOption(session, athletes)}
+                    </option>
+                  ))}
+                </select>
                 <button className="btn-secondary" type="submit">Load Records</button>
               </form>
               {records.length === 0 ? (
@@ -448,8 +462,9 @@ function findAthleteByName(athletes, typedName) {
 }
 
 function getSessionsForAthlete(roster, athletes, typedName) {
+  if (!normalizeName(typedName)) return [];
   const selectedAthlete = findAthleteByName(athletes, typedName);
-  if (!selectedAthlete) return roster;
+  if (!selectedAthlete) return [];
   return roster.filter((session) => session.athleteId === selectedAthlete.athleteId);
 }
 

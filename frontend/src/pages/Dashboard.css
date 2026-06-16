@@ -1777,6 +1777,12 @@ textarea:focus {
   background: #fff8f1;
 }
 
+.muted-text {
+  color: #667085;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 @media (max-width: 1120px) {
   .athlete-topbar {
     grid-template-columns: 1fr;

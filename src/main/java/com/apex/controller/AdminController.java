@@ -2,6 +2,7 @@ package com.apex.controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,6 +25,8 @@ import com.apex.domain.Invoice;
 import com.apex.domain.InvoiceStatus;
 import com.apex.domain.Physiotherapist;
 import com.apex.domain.Role;
+import com.apex.domain.Session;
+import com.apex.domain.SessionStatus;
 import com.apex.domain.User;
 import com.apex.repository.interfaces.ClinicalReportRepository;
 import com.apex.repository.interfaces.EquipmentRepository;
@@ -32,6 +36,7 @@ import com.apex.repository.interfaces.UserRepository;
 import com.apex.service.AccountService;
 import com.apex.service.PaymentService;
 import com.apex.service.ProfileService;
+import com.apex.service.SessionService;
 import com.apex.service.facade.AdmissionFacade;
 
 /**
@@ -48,6 +53,7 @@ public class AdminController {
 
     private final AdmissionFacade admissionFacade;
     private final ProfileService profileService;
+    private final SessionService sessionService;
     private final PaymentService paymentService;
     private final AccountService accountService;
     private final FacilityRepository facilityRepository;
@@ -59,6 +65,7 @@ public class AdminController {
     public AdminController(
             AdmissionFacade admissionFacade,
             ProfileService profileService,
+            SessionService sessionService,
             PaymentService paymentService,
             AccountService accountService,
             FacilityRepository facilityRepository,
@@ -68,6 +75,7 @@ public class AdminController {
             PhysiotherapistRepository physiotherapistRepository) {
         this.admissionFacade          = admissionFacade;
         this.profileService           = profileService;
+        this.sessionService           = sessionService;
         this.paymentService           = paymentService;
         this.accountService           = accountService;
         this.facilityRepository       = facilityRepository;
@@ -111,6 +119,8 @@ public class AdminController {
     public ResponseEntity<?> getAnalytics() {
         List<Athlete> athletes = profileService.getAllAthletes();
         List<Invoice> ledger   = paymentService.getFullLedger();
+        List<Session> sessions = sessionService.getAllSessions();
+        List<Facility> facilities = facilityRepository.findAll();
 
         double totalRevenue = ledger.stream()
                 .mapToDouble(Invoice::getFinalAmount)
@@ -121,12 +131,34 @@ public class AdminController {
                         == InvoiceStatus.PENDING)
                 .count();
 
-        return ResponseEntity.ok(Map.of(
-                "totalAthletes",   athletes.size(),
-                "totalInvoices",   ledger.size(),
-                "totalRevenue",    totalRevenue,
-                "pendingInvoices", pendingInvoices
-        ));
+        Map<Integer, Long> facilityUsage = sessions.stream()
+                .filter(session -> session.getFacilityId() > 0)
+                .collect(Collectors.groupingBy(
+                        Session::getFacilityId, Collectors.counting()));
+
+        Map<String, Object> analytics = new java.util.HashMap<>();
+        analytics.put("totalAthletes", athletes.size());
+        analytics.put("totalInvoices", ledger.size());
+        analytics.put("totalRevenue", totalRevenue);
+        analytics.put("pendingInvoices", pendingInvoices);
+        analytics.put("totalSessions", sessions.size());
+        analytics.put("completedSessions", sessions.stream()
+                .filter(session -> session.getStatus()
+                        == SessionStatus.COMPLETED).count());
+        analytics.put("cancelledSessions", sessions.stream()
+                .filter(session -> session.getStatus()
+                        == SessionStatus.CANCELLED).count());
+        analytics.put("scheduledSessions", sessions.stream()
+                .filter(session -> session.getStatus()
+                        == SessionStatus.SCHEDULED).count());
+        analytics.put("availableFacilities", facilities.stream()
+                .filter(facility -> facility.getStatus()
+                        == FacilityStatus.AVAILABLE).count());
+        analytics.put("maintenanceFacilities", facilities.stream()
+                .filter(facility -> facility.getStatus()
+                        == FacilityStatus.MAINTENANCE).count());
+        analytics.put("facilityUsage", facilityUsage);
+        return ResponseEntity.ok(analytics);
     }
 
     // UC16 — All athletes
@@ -134,6 +166,11 @@ public class AdminController {
     public ResponseEntity<List<Athlete>> getAllAthletes() {
         return ResponseEntity.ok(
                 profileService.getAllAthletes());
+    }
+
+    @GetMapping("/sessions/completed")
+    public ResponseEntity<List<Session>> getCompletedSessions() {
+        return ResponseEntity.ok(sessionService.getCompletedSessions());
     }
 
     // ─── UC17: Facility & Equipment Management (Fix 5) ───────────
@@ -244,7 +281,29 @@ public class AdminController {
     // UC19 — View all staff (therapists + admins)
     @GetMapping("/staff")
     public ResponseEntity<?> getAllStaff() {
-        List<User> staff = userRepository.findAllStaff();
+        List<Map<String, Object>> staff = userRepository.findAllStaff()
+                .stream()
+                .map(user -> {
+                    Map<String, Object> row = new java.util.HashMap<>();
+                    row.put("userId", user.getUserId());
+                    row.put("username", user.getUsername());
+                    row.put("email", user.getEmail());
+                    row.put("role", user.getRole().name());
+                    row.put("fullname", user.getFullname());
+                    row.put("contact", user.getContact());
+                    row.put("active", user.isActive());
+                    if (user.getRole() == Role.THERAPIST) {
+                        physiotherapistRepository.findByUserId(user.getUserId())
+                                .ifPresent(therapist -> {
+                                    row.put("specialization",
+                                            therapist.getSpecialization());
+                                    row.put("licenseNumber",
+                                            therapist.getLicenseNumber());
+                                });
+                    }
+                    return row;
+                })
+                .toList();
         return ResponseEntity.ok(staff);
     }
 
@@ -253,13 +312,19 @@ public class AdminController {
     public ResponseEntity<?> addStaff(
             @RequestBody Map<String, String> body) {
         try {
+            Role role = Role.valueOf(body.get("role"));
+            if (role == Role.ATHLETE) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error",
+                                "Staff accounts must be ADMIN or THERAPIST."));
+            }
             User staff = accountService.createAccount(
                     body.get("username"),
                     body.get("password"),
                     body.get("email"),
                     body.get("fullName"),
                     body.getOrDefault("contact", ""),
-                    Role.valueOf(body.get("role")));
+                    role);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Staff account created",
@@ -273,23 +338,85 @@ public class AdminController {
     }
 
     // UC19 — Deactivate staff (soft delete)
+    // UC19 - Update staff profile details
+    @PutMapping("/staff/{userId}")
+    public ResponseEntity<?> updateStaff(
+            @PathVariable int userId,
+            @RequestBody Map<String, String> body,
+            @RequestHeader("X-User-Id") int requestUserId) {
+        try {
+            ResponseEntity<?> validation =
+                    validateStaffManagementTarget(userId, requestUserId);
+            if (validation != null) return validation;
+
+            User staff = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Staff account not found."));
+
+            String email = body.getOrDefault("email", staff.getEmail());
+            String fullname = body.getOrDefault("fullName",
+                    staff.getFullname());
+            String contact = body.getOrDefault("contact",
+                    staff.getContact() == null ? "" : staff.getContact());
+            userRepository.updateStaffInfo(userId, email, fullname, contact);
+
+            if (staff.getRole() == Role.THERAPIST) {
+                var therapist = physiotherapistRepository.findByUserId(userId);
+                if (therapist.isPresent()) {
+                    String specialization = body.getOrDefault(
+                            "specialization",
+                            therapist.get().getSpecialization());
+                    String licenseNumber = body.getOrDefault(
+                            "licenseNumber",
+                            therapist.get().getLicenseNumber());
+                    physiotherapistRepository.updateProfessionalInfo(
+                            userId, specialization, licenseNumber);
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Staff profile updated successfully"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PutMapping("/staff/{userId}/deactivate")
     public ResponseEntity<?> deactivateStaff(
-            @PathVariable int userId) {
-        accountService.deactivateAccount(userId);
-        return ResponseEntity.ok(Map.of(
-                "message",
-                "Account #" + userId + " deactivated successfully"));
+            @PathVariable int userId,
+            @RequestHeader("X-User-Id") int requestUserId) {
+        try {
+            ResponseEntity<?> validation =
+                    validateStaffManagementTarget(userId, requestUserId);
+            if (validation != null) return validation;
+            accountService.deactivateAccount(userId);
+            return ResponseEntity.ok(Map.of(
+                    "message",
+                    "Account #" + userId + " deactivated successfully"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 
     // UC19 — Hard delete staff account
     @DeleteMapping("/staff/{userId}")
     public ResponseEntity<?> deleteStaff(
-            @PathVariable int userId) {
-        accountService.deleteAccount(userId);
-        return ResponseEntity.ok(Map.of(
-                "message",
-                "Staff account #" + userId + " permanently deleted"));
+            @PathVariable int userId,
+            @RequestHeader("X-User-Id") int requestUserId) {
+        try {
+            ResponseEntity<?> validation =
+                    validateStaffManagementTarget(userId, requestUserId);
+            if (validation != null) return validation;
+            accountService.deleteAccount(userId);
+            return ResponseEntity.ok(Map.of(
+                    "message",
+                    "Staff account #" + userId + " permanently deleted"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 
     // UC14 — Approve clinical report
@@ -305,5 +432,25 @@ public class AdminController {
                 });
         return ResponseEntity.ok(Map.of(
                 "message", "Report #" + reportId + " approved"));
+    }
+
+    private ResponseEntity<?> validateStaffManagementTarget(
+            int targetUserId, int requestUserId) {
+        if (targetUserId == requestUserId) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error",
+                    "You cannot deactivate or delete your own admin account."));
+        }
+
+        return userRepository.findById(targetUserId)
+                .map(target -> {
+                    if (target.getRole() == Role.ATHLETE) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                                "error",
+                                "This action is only for staff accounts."));
+                    }
+                    return null;
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

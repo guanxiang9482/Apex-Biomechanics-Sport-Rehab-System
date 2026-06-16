@@ -104,6 +104,12 @@ public class PaymentService {
                     session.getAthleteId() + ".");
         }
 
+        if (!invoiceRepository.findBySessionId(sessionId).isEmpty()) {
+            throw new IllegalStateException(
+                    "Session #" + sessionId +
+                    " has already been billed.");
+        }
+
         // --- Strategy pattern: delegate calculation ---
         selectStrategy(billingType);
         double baseAmount   = strategy.calculateFees(session);
