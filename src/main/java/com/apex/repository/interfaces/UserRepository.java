@@ -1,5 +1,6 @@
 package com.apex.repository.interfaces;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.apex.domain.User;
@@ -15,4 +16,5 @@ public interface UserRepository {
     void updateLastLoginAt(int userId);
     void setActiveStatus(int userId, boolean isActive);
     void delete(int userId);
+    List<User> findAllStaff();
 }

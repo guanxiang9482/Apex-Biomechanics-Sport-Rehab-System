@@ -1,21 +1,44 @@
 package com.apex.controller;
 
-import com.apex.domain.*;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.apex.domain.Athlete;
+import com.apex.domain.BillingType;
+import com.apex.domain.Equipment;
+import com.apex.domain.EquipmentStatus;
+import com.apex.domain.Facility;
+import com.apex.domain.FacilityStatus;
+import com.apex.domain.Invoice;
+import com.apex.domain.InvoiceStatus;
+import com.apex.domain.Role;
+import com.apex.domain.User;
 import com.apex.repository.interfaces.ClinicalReportRepository;
+import com.apex.repository.interfaces.EquipmentRepository;
 import com.apex.repository.interfaces.FacilityRepository;
+import com.apex.repository.interfaces.UserRepository;
 import com.apex.service.AccountService;
 import com.apex.service.PaymentService;
 import com.apex.service.ProfileService;
 import com.apex.service.facade.AdmissionFacade;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Map;
 
 /**
  * UC15, UC16, UC17, UC18, UC19, UC20
  * All administrator operations.
+ *
+ * Fix 5 — UC17: Added update facility status + view/update
+ *   equipment status endpoints.
+ * Fix 5 — UC19: Added view all staff + delete staff endpoints.
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -26,7 +49,9 @@ public class AdminController {
     private final PaymentService paymentService;
     private final AccountService accountService;
     private final FacilityRepository facilityRepository;
+    private final EquipmentRepository equipmentRepository;
     private final ClinicalReportRepository clinicalReportRepository;
+    private final UserRepository userRepository;
 
     public AdminController(
             AdmissionFacade admissionFacade,
@@ -34,13 +59,17 @@ public class AdminController {
             PaymentService paymentService,
             AccountService accountService,
             FacilityRepository facilityRepository,
-            ClinicalReportRepository clinicalReportRepository) {
+            EquipmentRepository equipmentRepository,
+            ClinicalReportRepository clinicalReportRepository,
+            UserRepository userRepository) {
         this.admissionFacade          = admissionFacade;
         this.profileService           = profileService;
         this.paymentService           = paymentService;
         this.accountService           = accountService;
         this.facilityRepository       = facilityRepository;
+        this.equipmentRepository      = equipmentRepository;
         this.clinicalReportRepository = clinicalReportRepository;
+        this.userRepository           = userRepository;
     }
 
     // UC15 — Admit New Athlete (Facade Pattern showcase)
@@ -60,6 +89,7 @@ public class AdminController {
             return ResponseEntity.ok(Map.of(
                     "message",   "Athlete admitted successfully",
                     "athleteId", athlete.getAthleteId(),
+                    "userId",    athlete.getUserId(),
                     "fullname",  athlete.getFullname(),
                     "status",    admissionFacade
                             .getAdmissionStatus(
@@ -101,14 +131,67 @@ public class AdminController {
                 profileService.getAllAthletes());
     }
 
-    // UC17 — View facilities
+    // ─── UC17: Facility & Equipment Management (Fix 5) ───────────
+
+    // UC17 — View all facilities
     @GetMapping("/facilities")
     public ResponseEntity<List<Facility>> getFacilities() {
         return ResponseEntity.ok(
                 facilityRepository.findAll());
     }
 
-    // UC18 — Process billing (Strategy Pattern showcase)
+    // UC17 — Update facility status (AVAILABLE / MAINTENANCE / RESERVED)
+    @PutMapping("/facilities/{facilityId}/status")
+    public ResponseEntity<?> updateFacilityStatus(
+            @PathVariable int facilityId,
+            @RequestBody Map<String, String> body) {
+        try {
+            FacilityStatus status =
+                    FacilityStatus.valueOf(body.get("status"));
+            facilityRepository.updateStatus(facilityId, status);
+            return ResponseEntity.ok(Map.of(
+                    "message",
+                    "Facility #" + facilityId +
+                    " status updated to " + status.name()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error",
+                            "Invalid status. Use: AVAILABLE, " +
+                            "MAINTENANCE, RESERVED"));
+        }
+    }
+
+    // UC17 — View equipment by facility
+    @GetMapping("/facilities/{facilityId}/equipment")
+    public ResponseEntity<List<Equipment>> getEquipmentByFacility(
+            @PathVariable int facilityId) {
+        return ResponseEntity.ok(
+                equipmentRepository.findByFacilityId(facilityId));
+    }
+
+    // UC17 — Update equipment status (AVAILABLE / IN_USE / MAINTENANCE)
+    @PutMapping("/equipment/{itemId}/status")
+    public ResponseEntity<?> updateEquipmentStatus(
+            @PathVariable int itemId,
+            @RequestBody Map<String, String> body) {
+        try {
+            EquipmentStatus status =
+                    EquipmentStatus.valueOf(body.get("status"));
+            equipmentRepository.updateStatus(itemId, status);
+            return ResponseEntity.ok(Map.of(
+                    "message",
+                    "Equipment #" + itemId +
+                    " status updated to " + status.name()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error",
+                            "Invalid status. Use: AVAILABLE, " +
+                            "IN_USE, MAINTENANCE"));
+        }
+    }
+
+    // ─── UC18: Process Session Billing ───────────────────────────
+
     @PostMapping("/billing/process")
     public ResponseEntity<?> processBilling(
             @RequestBody Map<String, Object> body) {
@@ -123,18 +206,34 @@ public class AdminController {
                             sessionId, athleteId, bt);
 
             return ResponseEntity.ok(Map.of(
-                    "message",     "Billing processed",
+                    "message",     "Billing processed successfully",
                     "invoiceId",   invoice.getInvoiceId(),
                     "baseAmount",  invoice.getBaseAmount(),
                     "discount",    invoice.getDiscountRate(),
-                    "finalAmount", invoice.getFinalAmount(),
+                    "finalAmount", invoice.getFinalAmount(),   // Fix 7 alignment
                     "strategy",    paymentService
                             .getCurrentStrategyName()
             ));
-        } catch (Exception e) {
+        } catch (IllegalStateException | IllegalArgumentException e) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", e.getMessage()));
         }
+    }
+
+    // UC20 — Full financial ledger
+    @GetMapping("/ledger")
+    public ResponseEntity<List<Invoice>> getFullLedger() {
+        return ResponseEntity.ok(
+                paymentService.getFullLedger());
+    }
+
+    // ─── UC19: Staff Profile Management (Fix 5) ──────────────────
+
+    // UC19 — View all staff (therapists + admins)
+    @GetMapping("/staff")
+    public ResponseEntity<?> getAllStaff() {
+        List<User> staff = userRepository.findAllStaff();
+        return ResponseEntity.ok(staff);
     }
 
     // UC19 — Add staff (Therapist or Admin)
@@ -161,21 +260,24 @@ public class AdminController {
         }
     }
 
-    // UC19 — Deactivate staff
+    // UC19 — Deactivate staff (soft delete)
     @PutMapping("/staff/{userId}/deactivate")
     public ResponseEntity<?> deactivateStaff(
             @PathVariable int userId) {
         accountService.deactivateAccount(userId);
         return ResponseEntity.ok(Map.of(
                 "message",
-                "Account deactivated successfully"));
+                "Account #" + userId + " deactivated successfully"));
     }
 
-    // UC20 — Full financial ledger
-    @GetMapping("/ledger")
-    public ResponseEntity<List<Invoice>> getFullLedger() {
-        return ResponseEntity.ok(
-                paymentService.getFullLedger());
+    // UC19 — Hard delete staff account
+    @DeleteMapping("/staff/{userId}")
+    public ResponseEntity<?> deleteStaff(
+            @PathVariable int userId) {
+        accountService.deleteAccount(userId);
+        return ResponseEntity.ok(Map.of(
+                "message",
+                "Staff account #" + userId + " permanently deleted"));
     }
 
     // UC14 — Approve clinical report
@@ -190,6 +292,6 @@ public class AdminController {
                     clinicalReportRepository.update(report);
                 });
         return ResponseEntity.ok(Map.of(
-                "message", "Report approved"));
+                "message", "Report #" + reportId + " approved"));
     }
 }

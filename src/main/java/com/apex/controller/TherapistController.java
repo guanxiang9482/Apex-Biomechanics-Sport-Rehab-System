@@ -1,19 +1,39 @@
 package com.apex.controller;
 
-import com.apex.domain.*;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.apex.domain.BiomechanicalRecord;
+import com.apex.domain.ClinicalReport;
+import com.apex.domain.MedicalRecord;
+import com.apex.domain.Session;
+import com.apex.domain.SessionStatus;
 import com.apex.repository.interfaces.BiomechanicsRepository;
 import com.apex.repository.interfaces.ClinicalReportRepository;
 import com.apex.repository.interfaces.MedicalRecordRepository;
 import com.apex.service.SessionService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Map;
 
 /**
  * UC11, UC12, UC13, UC14
  * All physiotherapist clinical operations.
+ *
+ * Fix 4: UC14 generateReport now:
+ *   - Accepts athleteId in request body
+ *   - Compiles sessions, biomechanical records, medical records
+ *   - Returns structured progress report
+ *   - New endpoint /reports/athlete/{athleteId}/compile for
+ *     read-only preview without saving to DB
  */
 @RestController
 @RequestMapping("/api/therapist")
@@ -84,6 +104,14 @@ public class TherapistController {
                 biomechanicsRepository.findBySessionId(sessionId));
     }
 
+    // UC12 — View all records for an athlete (recovery metrics)
+    @GetMapping("/biomechanics/athlete/{athleteId}")
+    public ResponseEntity<List<BiomechanicalRecord>> getByAthlete(
+            @PathVariable int athleteId) {
+        return ResponseEntity.ok(
+                biomechanicsRepository.findByAthleteId(athleteId));
+    }
+
     // UC13 — Update session status
     @PutMapping("/sessions/{sessionId}/status")
     public ResponseEntity<?> updateSessionStatus(
@@ -128,25 +156,98 @@ public class TherapistController {
                 medicalRecordRepository.findByAthleteId(athleteId));
     }
 
-    // UC14 — Generate clinical report
+    /**
+     * UC14 — Compile Athlete Progress Report (Read-only preview)
+     *
+     * Fix 4: Retrieves session history, biomechanical records,
+     * and medical records for an athlete and compiles them into
+     * a structured JSON report. This is the "Generate Report"
+     * UC14 requires per the proposal.
+     */
+    @GetMapping("/reports/athlete/{athleteId}/compile")
+    public ResponseEntity<?> compileAthleteReport(
+            @PathVariable int athleteId) {
+
+        // Retrieve all clinical data for this athlete
+        List<Session> completedSessions =
+                sessionService.getCompletedSessionHistory(athleteId);
+        List<BiomechanicalRecord> bioRecords =
+                biomechanicsRepository.findByAthleteId(athleteId);
+        List<MedicalRecord> medRecords =
+                medicalRecordRepository.findByAthleteId(athleteId);
+
+        // Compile summary statistics from biomechanical data
+        double avgJumpPower = bioRecords.stream()
+                .mapToDouble(BiomechanicalRecord::getJumpPower)
+                .average().orElse(0.0);
+        double avgJointMobility = bioRecords.stream()
+                .mapToDouble(BiomechanicalRecord::getJointMobility)
+                .average().orElse(0.0);
+        double avgPostureScore = bioRecords.stream()
+                .mapToDouble(BiomechanicalRecord::getPostureScore)
+                .average().orElse(0.0);
+
+        // Build structured report
+        Map<String, Object> report = new HashMap<>();
+        report.put("athleteId",          athleteId);
+        report.put("generatedAt",        LocalDateTime.now().toString());
+        report.put("completedSessions",  completedSessions);
+        report.put("totalSessions",      completedSessions.size());
+        report.put("biomechanicalRecords", bioRecords);
+        report.put("totalBioRecords",    bioRecords.size());
+        report.put("medicalRecords",     medRecords);
+        report.put("avgJumpPower",
+                Math.round(avgJumpPower * 100.0) / 100.0);
+        report.put("avgJointMobility",
+                Math.round(avgJointMobility * 100.0) / 100.0);
+        report.put("avgPostureScore",
+                Math.round(avgPostureScore * 100.0) / 100.0);
+
+        return ResponseEntity.ok(report);
+    }
+
+    /**
+     * UC14 — Save formal clinical report to DB
+     *
+     * Fix 4: Now accepts athleteId, compiles summary stats,
+     * and stores a rich description instead of empty fields.
+     */
     @PostMapping("/reports/generate")
     public ResponseEntity<?> generateReport(
             @RequestBody Map<String, Object> body) {
-        int therapistId  = (Integer) body.get("therapistId");
-        String reportType= (String) body.get("reportType");
-        String description=(String) body.get("description");
+        int therapistId   = (Integer) body.get("therapistId");
+        int athleteId     = (Integer) body.get("athleteId");
+        String reportType = (String) body.get("reportType");
+        String extraNotes = (String) body.getOrDefault(
+                "description", "");
+
+        // Compile counts for rich description
+        List<Session> sessions =
+                sessionService.getCompletedSessionHistory(athleteId);
+        List<BiomechanicalRecord> bioRecords =
+                biomechanicsRepository.findByAthleteId(athleteId);
+
+        String description = String.format(
+                "Athlete #%d | %s | Completed Sessions: %d | " +
+                "Biomechanical Records: %d | Notes: %s",
+                athleteId, reportType,
+                sessions.size(), bioRecords.size(), extraNotes);
 
         ClinicalReport report = new ClinicalReport(
                 therapistId, reportType, description);
         clinicalReportRepository.save(report);
 
         return ResponseEntity.ok(Map.of(
-                "message",  "Report generated successfully",
-                "reportId", report.getReportId()
+                "message",          "Report generated successfully",
+                "reportId",         report.getReportId(),
+                "athleteId",        athleteId,
+                "sessionsCompiled", sessions.size(),
+                "bioRecordsCompiled", bioRecords.size(),
+                "description",      description
         ));
     }
 
-    // UC14 — View own reports
+    // UC14 — View own reports by therapist
     @GetMapping("/reports/{therapistId}")
     public ResponseEntity<List<ClinicalReport>> getReports(
             @PathVariable int therapistId) {

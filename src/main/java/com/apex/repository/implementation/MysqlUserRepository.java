@@ -3,6 +3,7 @@ package com.apex.repository.implementation;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -40,7 +41,6 @@ public class MysqlUserRepository implements UserRepository {
                 : null;
         Role role = Role.valueOf(rs.getString("role"));
 
-        // Match YOUR constructor parameter order exactly
         return switch (role) {
             case ATHLETE -> new Athlete(
                     userId, username, password, email,
@@ -123,5 +123,13 @@ public class MysqlUserRepository implements UserRepository {
     @Override
     public void delete(int userId) {
         jdbc.update("DELETE FROM users WHERE user_id = ?", userId);
+    }
+
+    @Override
+    public List<User> findAllStaff() {
+        String sql = "SELECT * FROM users " +
+                "WHERE role IN ('THERAPIST', 'ADMIN') " +
+                "ORDER BY role, fullname";
+        return jdbc.query(sql, this::mapRow);
     }
 }

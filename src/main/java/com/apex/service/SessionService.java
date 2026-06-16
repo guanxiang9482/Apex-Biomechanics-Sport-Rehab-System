@@ -1,21 +1,26 @@
 package com.apex.service;
 
-import com.apex.domain.Session;
-import com.apex.domain.SessionStatus;
-import com.apex.repository.interfaces.SessionRepository;
-import com.apex.service.observer.NotificationEngine;
-import org.springframework.stereotype.Service;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.stereotype.Service;
+
+import com.apex.domain.Session;
+import com.apex.domain.SessionStatus;
+import com.apex.repository.interfaces.SessionRepository;
+import com.apex.service.observer.NotificationEngine;
+
 /**
- * SRP: Responsible for rehab session
- * scheduling and lifecycle management.
+ * SRP: Responsible for rehab session scheduling
+ * and lifecycle management.
  * UC5, UC7, UC9, UC11, UC13
- * Triggers Observer on every state change.
+ *
+ * Fix 6: getSessionHistory() now returns only COMPLETED
+ * sessions, matching UC8 spec ("past medical/rehab interactions").
+ * getCompletedSessionHistory() is a new named method used by
+ * TherapistController UC14 report compilation.
  */
 @Service
 public class SessionService {
@@ -39,7 +44,7 @@ public class SessionService {
                 facilityId, scheduledDate, durationMins, sessionType);
         sessionRepository.save(session);
 
-        // UC21 — Observer notification
+        // UC21 — Observer notification (broadcast)
         notificationEngine.notifyAllObservers(
                 "New session booked for Athlete #" + athleteId +
                 " on " + scheduledDate);
@@ -107,9 +112,28 @@ public class SessionService {
                 .toList();
     }
 
-    // UC8 — Session history
+    /**
+     * UC8 — View Session History
+     *
+     * Fix 6: Returns only COMPLETED sessions.
+     * The proposal states UC8 displays "past medical/rehab
+     * interactions" — scheduled or cancelled sessions are
+     * not part of the athlete's clinical history.
+     */
     public List<Session> getSessionHistory(int athleteId) {
-        return sessionRepository.findByAthleteId(athleteId);
+        return sessionRepository.findByAthleteId(athleteId)
+                .stream()
+                .filter(s -> s.getStatus()
+                        == SessionStatus.COMPLETED)
+                .toList();
+    }
+
+    /**
+     * UC14 — Used by TherapistController to compile
+     * athlete report. Same logic as UC8 history.
+     */
+    public List<Session> getCompletedSessionHistory(int athleteId) {
+        return getSessionHistory(athleteId);
     }
 
     // UC9 — Upcoming sessions
