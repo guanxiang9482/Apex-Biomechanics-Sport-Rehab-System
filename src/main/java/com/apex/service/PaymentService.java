@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import com.apex.domain.Athlete;
 import com.apex.domain.BillingType;
 import com.apex.domain.Invoice;
+import com.apex.domain.InvoiceStatus;
+import com.apex.domain.PaymentMethod;
 import com.apex.domain.Session;
 import com.apex.domain.SessionStatus;
 import com.apex.repository.interfaces.AthleteRepository;
@@ -146,6 +148,28 @@ public class PaymentService {
     // UC20 — Athlete's own invoices
     public List<Invoice> getAthleteInvoices(int athleteId) {
         return invoiceRepository.findByAthleteId(athleteId);
+    }
+
+    public Invoice payInvoice(int invoiceId, int athleteId,
+                              PaymentMethod paymentMethod) {
+        Invoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Invoice not found: #" + invoiceId));
+        if (invoice.getAthleteId() != athleteId) {
+            throw new IllegalArgumentException(
+                    "This invoice does not belong to the selected athlete.");
+        }
+        if (invoice.getStatus() == InvoiceStatus.PAID) {
+            throw new IllegalStateException(
+                    "Invoice #" + invoiceId + " has already been paid.");
+        }
+
+        invoiceRepository.markPaid(invoiceId, paymentMethod);
+        athleteRepository.findById(athleteId)
+                .ifPresent(athlete -> notificationEngine.notifyObserver(
+                        athlete.getUserId(),
+                        "Invoice #" + invoiceId + " paid successfully."));
+        return invoiceRepository.findById(invoiceId).orElse(invoice);
     }
 
     public String getCurrentStrategyName() {

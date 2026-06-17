@@ -164,7 +164,7 @@ CREATE TABLE `invoices` (
   `paid_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`invoice_id`),
   KEY `athlete_id` (`athlete_id`),
-  KEY `session_id` (`session_id`),
+  UNIQUE KEY `unique_invoice_session` (`session_id`),
   CONSTRAINT `invoices_ibfk_1` FOREIGN KEY (`athlete_id`) REFERENCES `athletes` (`athlete_id`),
   CONSTRAINT `invoices_ibfk_2` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`session_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

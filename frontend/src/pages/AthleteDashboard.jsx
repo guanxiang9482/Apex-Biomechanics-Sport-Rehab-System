@@ -296,6 +296,20 @@ function AthleteDashboard() {
     }
   };
 
+  const handlePayInvoice = async (invoiceId) => {
+    if (!athleteProfile?.athleteId) {
+      showMessage('error', 'Athlete profile is still loading. Please try again.');
+      return;
+    }
+    try {
+      await athlete.payInvoice(athleteProfile.athleteId, invoiceId);
+      showMessage('success', `Invoice #${invoiceId} paid successfully.`);
+      await loadDashboard();
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
   const unreadCount = noticeList.filter((item) => !isNotificationRead(item)).length;
   const paidTotal = invoices
     .filter((invoice) => invoice.status === 'PAID')
@@ -586,7 +600,7 @@ function AthleteDashboard() {
 
         {activeSection === 'invoices' && (
           <section className="section">
-            <InvoiceTable invoices={invoices} />
+            <InvoiceTable invoices={invoices} onPay={handlePayInvoice} />
           </section>
         )}
 
@@ -676,7 +690,7 @@ function SessionTable({ sessions, therapists = [] }) {
   );
 }
 
-function InvoiceTable({ invoices }) {
+function InvoiceTable({ invoices, onPay }) {
   if (invoices.length === 0) {
     return <p className="empty-state">No financial records found.</p>;
   }
@@ -692,6 +706,7 @@ function InvoiceTable({ invoices }) {
             <th>Amount</th>
             <th>Status</th>
             <th>Created</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -703,6 +718,13 @@ function InvoiceTable({ invoices }) {
               <td>{formatCurrency(invoice.finalAmount ?? invoice.amount)}</td>
               <td><span className={statusClass(invoice.status)}>{invoice.status}</span></td>
               <td>{formatDateTime(invoice.createdAt)}</td>
+              <td>
+                {invoice.status === 'PENDING' ? (
+                  <button className="btn-primary compact" type="button" onClick={() => onPay(invoice.invoiceId)}>Pay Invoice</button>
+                ) : (
+                  <span className="muted-text">{invoice.status === 'PAID' ? 'Paid' : '-'}</span>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

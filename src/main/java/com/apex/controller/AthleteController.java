@@ -296,6 +296,23 @@ public class AthleteController {
                 paymentService.getAthleteInvoices(athleteId));
     }
 
+    @PutMapping("/{athleteId}/invoices/{invoiceId}/pay")
+    public ResponseEntity<?> payInvoice(
+            @PathVariable int athleteId,
+            @PathVariable int invoiceId,
+            @RequestHeader("X-User-Id") int userId) {
+        ResponseEntity<?> accessError = requireOwnedAthlete(userId, athleteId);
+        if (accessError != null) return accessError;
+        try {
+            return ResponseEntity.ok(
+                    paymentService.payInvoice(invoiceId, athleteId,
+                            PaymentMethod.CASH));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
     private ResponseEntity<?> requireOwnedAthlete(int userId, int athleteId) {
         Optional<Athlete> requester =
                 profileService.getProfileByUserId(userId);

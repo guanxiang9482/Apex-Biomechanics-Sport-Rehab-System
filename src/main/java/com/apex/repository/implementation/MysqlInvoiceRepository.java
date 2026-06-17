@@ -99,6 +99,16 @@ public class MysqlInvoiceRepository implements InvoiceRepository {
     }
 
     @Override
+    public void markPaid(int invoiceId, PaymentMethod paymentMethod) {
+        jdbc.update("UPDATE invoices SET status = ?, " +
+                "payment_method = ?, paid_at = NOW() " +
+                "WHERE invoice_id = ?",
+                InvoiceStatus.PAID.name(),
+                paymentMethod.name(),
+                invoiceId);
+    }
+
+    @Override
     public void delete(int invoiceId) {
         jdbc.update("DELETE FROM invoices WHERE invoice_id = ?",
                 invoiceId);

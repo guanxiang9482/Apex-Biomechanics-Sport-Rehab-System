@@ -84,6 +84,8 @@ export const athlete = {
     request(`/athlete/${athleteId}/medical-records`),
   getInvoices: (athleteId) =>
     request(`/athlete/${athleteId}/invoices`),
+  payInvoice: (athleteId, invoiceId) =>
+    request(`/athlete/${athleteId}/invoices/${invoiceId}/pay`, 'PUT'),
 };
 
 export const therapist = {
@@ -103,6 +105,10 @@ export const therapist = {
     }),
   getBiomechanicalsBySession: (sessionId) =>
     request(`/therapist/biomechanics/session/${sessionId}`),
+  createMedicalRecord: (athleteId, therapistId, diagnosisNotes) =>
+    request('/therapist/medical-records/create', 'POST', {
+      athleteId, therapistId, diagnosisNotes,
+    }),
   updateSessionStatus: (sessionId, therapistId, status) =>
     request(`/therapist/sessions/${sessionId}/status`, 'PUT', { therapistId: String(therapistId), status }),
   compileAthleteReport: (athleteId) =>

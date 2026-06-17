@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ import com.apex.repository.interfaces.MedicalRecordRepository;
 import com.apex.repository.interfaces.PhysiotherapistRepository;
 import com.apex.service.ProfileService;
 import com.apex.service.SessionService;
+import com.apex.service.observer.NotificationEngine;
 
 /**
  * UC11, UC12, UC13, UC14
@@ -49,6 +51,8 @@ public class TherapistController {
     private final ClinicalReportRepository clinicalReportRepository;
     private final PhysiotherapistRepository physiotherapistRepository;
     private final ProfileService profileService;
+    private final NotificationEngine notificationEngine;
+    private final JdbcTemplate jdbc;
 
     public TherapistController(
             SessionService sessionService,
@@ -56,13 +60,17 @@ public class TherapistController {
             MedicalRecordRepository medicalRecordRepository,
             ClinicalReportRepository clinicalReportRepository,
             PhysiotherapistRepository physiotherapistRepository,
-            ProfileService profileService) {
+            ProfileService profileService,
+            NotificationEngine notificationEngine,
+            JdbcTemplate jdbc) {
         this.sessionService           = sessionService;
         this.biomechanicsRepository   = biomechanicsRepository;
         this.medicalRecordRepository  = medicalRecordRepository;
         this.clinicalReportRepository = clinicalReportRepository;
         this.physiotherapistRepository = physiotherapistRepository;
         this.profileService           = profileService;
+        this.notificationEngine       = notificationEngine;
+        this.jdbc                     = jdbc;
     }
 
     @GetMapping("/user/{userId}/profile")
@@ -242,6 +250,11 @@ public class TherapistController {
         MedicalRecord record = new MedicalRecord(
                 athleteId, therapistId, notes);
         medicalRecordRepository.save(record);
+        profileService.getProfile(athleteId)
+                .ifPresent(athlete -> notificationEngine.notifyObserver(
+                        athlete.getUserId(),
+                        "New medical record added by therapist #" +
+                        therapistId + "."));
 
         return ResponseEntity.ok(Map.of(
                 "message",  "Medical record created",
@@ -363,6 +376,12 @@ public class TherapistController {
                 therapistId, reportType, description);
         report.submit();
         clinicalReportRepository.save(report);
+        notificationEngine.notifyObserver(userId,
+                "Report #" + report.getReportId() +
+                " submitted for admin review.");
+        notifyAdmins("Report #" + report.getReportId() +
+                " submitted by therapist #" + therapistId +
+                " for admin review.");
 
         return ResponseEntity.ok(Map.of(
                 "message",          "Report generated successfully",
@@ -421,5 +440,15 @@ public class TherapistController {
                     "This athlete is not assigned to this therapist."));
         }
         return null;
+    }
+
+    private void notifyAdmins(String event) {
+        List<Integer> adminUserIds = jdbc.query(
+                "SELECT u.user_id FROM users u " +
+                "JOIN administrators a ON u.user_id = a.user_id " +
+                "WHERE u.is_active = TRUE",
+                (rs, rowNum) -> rs.getInt("user_id"));
+        adminUserIds.forEach(adminUserId ->
+                notificationEngine.notifyObserver(adminUserId, event));
     }
 }

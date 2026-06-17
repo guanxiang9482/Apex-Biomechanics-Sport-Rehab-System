@@ -40,6 +40,7 @@ import com.apex.service.PaymentService;
 import com.apex.service.ProfileService;
 import com.apex.service.SessionService;
 import com.apex.service.facade.AdmissionFacade;
+import com.apex.service.observer.NotificationEngine;
 
 /**
  * UC15, UC16, UC17, UC18, UC19, UC20
@@ -64,6 +65,7 @@ public class AdminController {
     private final UserRepository userRepository;
     private final PhysiotherapistRepository physiotherapistRepository;
     private final JdbcTemplate jdbc;
+    private final NotificationEngine notificationEngine;
 
     public AdminController(
             AdmissionFacade admissionFacade,
@@ -76,7 +78,8 @@ public class AdminController {
             ClinicalReportRepository clinicalReportRepository,
             UserRepository userRepository,
             PhysiotherapistRepository physiotherapistRepository,
-            JdbcTemplate jdbc) {
+            JdbcTemplate jdbc,
+            NotificationEngine notificationEngine) {
         this.admissionFacade          = admissionFacade;
         this.profileService           = profileService;
         this.sessionService           = sessionService;
@@ -88,6 +91,7 @@ public class AdminController {
         this.userRepository           = userRepository;
         this.physiotherapistRepository = physiotherapistRepository;
         this.jdbc                     = jdbc;
+        this.notificationEngine       = notificationEngine;
     }
 
     // UC15 — Admit New Athlete (Facade Pattern showcase)
@@ -441,6 +445,15 @@ public class AdminController {
                 .map(report -> {
                     report.approve(adminId);
                     clinicalReportRepository.update(report);
+                    notificationEngine.notifyObserver(requestUserId,
+                            "Report #" + reportId + " approved.");
+                    physiotherapistRepository.findById(
+                            report.getSubmitByTherapist())
+                            .ifPresent(therapist ->
+                                    notificationEngine.notifyObserver(
+                                            therapist.getUserId(),
+                                            "Report #" + reportId +
+                                            " approved by admin."));
                     return ResponseEntity.ok(Map.of(
                             "message",
                             "Report #" + reportId + " approved"));

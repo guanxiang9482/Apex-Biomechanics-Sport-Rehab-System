@@ -20,6 +20,11 @@ const initialReportForm = {
   description: '',
 };
 
+const initialMedicalRecordForm = {
+  athleteName: '',
+  diagnosisNotes: '',
+};
+
 function TherapistDashboard() {
   const navigate = useNavigate();
   const [user] = useState(() => JSON.parse(localStorage.getItem('user')));
@@ -36,6 +41,7 @@ function TherapistDashboard() {
   const [metricForm, setMetricForm] = useState(initialMetricForm);
   const [recordLookupId, setRecordLookupId] = useState('');
   const [reportForm, setReportForm] = useState(initialReportForm);
+  const [medicalRecordForm, setMedicalRecordForm] = useState(initialMedicalRecordForm);
 
   const showMessage = (type, text) => setMessage({ type, text });
 
@@ -97,6 +103,11 @@ function TherapistDashboard() {
   const updateReportForm = (event) => {
     const { name, value } = event.target;
     setReportForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const updateMedicalRecordForm = (event) => {
+    const { name, value } = event.target;
+    setMedicalRecordForm((current) => ({ ...current, [name]: value }));
   };
 
   const handleStatusUpdate = async (sessionId, status) => {
@@ -171,6 +182,30 @@ function TherapistDashboard() {
       setReportForm(initialReportForm);
       showMessage('success', 'Clinical report generated successfully.');
       await loadDashboard();
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
+  const handleMedicalRecordSubmit = async (event) => {
+    event.preventDefault();
+    if (!therapistProfile?.therapistId) {
+      showMessage('error', 'Therapist profile is still loading. Please try again.');
+      return;
+    }
+    const selectedAthlete = findAthleteByName(athletes, medicalRecordForm.athleteName);
+    if (!selectedAthlete) {
+      showMessage('error', 'Please choose an athlete from the name suggestions.');
+      return;
+    }
+    try {
+      await therapist.createMedicalRecord(
+        selectedAthlete.athleteId,
+        therapistProfile.therapistId,
+        medicalRecordForm.diagnosisNotes,
+      );
+      setMedicalRecordForm(initialMedicalRecordForm);
+      showMessage('success', 'Medical record created successfully.');
     } catch (error) {
       showMessage('error', error.message);
     }
@@ -387,6 +422,18 @@ function TherapistDashboard() {
 
         {activeSection === 'reports' && (
           <section className="section section-stack">
+            <form className="panel form-grid single-column" onSubmit={handleMedicalRecordSubmit}>
+              <label>
+                Athlete Name
+                <input name="athleteName" list="therapist-athletes" value={medicalRecordForm.athleteName} onChange={updateMedicalRecordForm} placeholder="Start typing athlete name" required />
+              </label>
+              <label>
+                Diagnosis Notes
+                <textarea name="diagnosisNotes" rows="5" value={medicalRecordForm.diagnosisNotes} onChange={updateMedicalRecordForm} required />
+              </label>
+              <button className="btn-primary compact" type="submit">Create Medical Record</button>
+            </form>
+
             <form className="panel form-grid single-column" onSubmit={handleReportSubmit}>
               <label>
                 Athlete Name

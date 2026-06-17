@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.apex.domain.Invoice;
 import com.apex.domain.InvoiceStatus;
+import com.apex.domain.PaymentMethod;
 
 // ISP: Only billing and financial operations
 public interface InvoiceRepository {
@@ -14,5 +15,6 @@ public interface InvoiceRepository {
     List<Invoice> findBySessionId(int sessionId);
     List<Invoice> getLedger();
     void updateStatus(int invoiceId, InvoiceStatus status);
+    void markPaid(int invoiceId, PaymentMethod paymentMethod);
     void delete(int invoiceId);
 }
