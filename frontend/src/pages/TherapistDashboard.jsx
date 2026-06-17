@@ -46,16 +46,18 @@ function TherapistDashboard() {
 
     try {
       const profile = await therapist.getProfileByUserId(user.userId);
-      const [todayRoster, sessionData, athleteData, userNotifications] = await Promise.all([
+      const [todayRoster, sessionData, athleteData, reportData, userNotifications] = await Promise.all([
         therapist.getTodayRoster(profile.therapistId),
         therapist.getSessions(profile.therapistId),
         therapist.getAssignedAthletes(profile.therapistId),
+        therapist.getTherapistReports(profile.therapistId),
         notifications.getAll(user.userId),
       ]);
       setTherapistProfile(profile);
       setRoster(todayRoster);
       setSessionList(sessionData);
       setAthletes(athleteData);
+      setReports(reportData);
       setNoticeList(userNotifications);
     } catch (error) {
       showMessage('error', error.message);
@@ -168,19 +170,7 @@ function TherapistDashboard() {
       );
       setReportForm(initialReportForm);
       showMessage('success', 'Clinical report generated successfully.');
-    } catch (error) {
-      showMessage('error', error.message);
-    }
-  };
-
-  const handleReportLookup = async (event) => {
-    event.preventDefault();
-    if (!therapistProfile?.therapistId) {
-      showMessage('error', 'Therapist profile is still loading. Please try again.');
-      return;
-    }
-    try {
-      setReports(await therapist.getTherapistReports(therapistProfile.therapistId));
+      await loadDashboard();
     } catch (error) {
       showMessage('error', error.message);
     }
@@ -418,11 +408,8 @@ function TherapistDashboard() {
                 <h2>Report History</h2>
                 <span>UC14</span>
               </div>
-              <form className="form-inline" onSubmit={handleReportLookup}>
-                <button className="btn-secondary" type="submit">Load My Reports</button>
-              </form>
               {reports.length === 0 ? (
-                <p className="empty-state">No report data loaded.</p>
+                <p className="empty-state">No reports generated yet.</p>
               ) : (
                 <div className="card-list">
                   {reports.map((report) => (

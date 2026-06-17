@@ -315,6 +315,9 @@ function AdminDashboard() {
   const paidRevenue = ledger
     .filter((invoice) => invoice.status === 'PAID')
     .reduce((sum, invoice) => sum + Number(invoice.finalAmount ?? invoice.amount ?? 0), 0);
+  const billedSessionIds = new Set(ledger.map((invoice) => invoice.sessionId));
+  const billableSessions = completedSessions.filter((session) =>
+    !billedSessionIds.has(session.sessionId));
 
   const sectionTitle = {
     overview: 'Admin Overview',
@@ -535,13 +538,16 @@ function AdminDashboard() {
                 Completed Session
                 <select name="sessionId" value={billingForm.sessionId} onChange={updateBilling} required>
                   <option value="">Choose completed session</option>
-                  {getSessionsForAthlete(completedSessions, athletes, billingForm.athleteName).map((session) => (
+                  {getSessionsForAthlete(billableSessions, athletes, billingForm.athleteName).map((session) => (
                     <option value={session.sessionId} key={session.sessionId}>
                       {formatSessionOption(session, athletes)}
                     </option>
                   ))}
                 </select>
               </label>
+              {billingForm.athleteName && getSessionsForAthlete(billableSessions, athletes, billingForm.athleteName).length === 0 && (
+                <p className="empty-state full-width">No unbilled completed sessions found for this athlete.</p>
+              )}
               <label>
                 Athlete Name
                 <input name="athleteName" list="admin-athletes" value={billingForm.athleteName} onChange={updateBilling} placeholder="Start typing athlete name" required />
@@ -560,7 +566,7 @@ function AdminDashboard() {
             {billingResult && (
               <div className="panel result-panel">
                 <h2>Billing Result</h2>
-                <p>Invoice #{billingResult.invoiceId} created with {billingResult.strategy}.</p>
+                <p>Invoice #{billingResult.invoiceId} created for {formatAthleteName(athletes.find((athlete) => athlete.athleteId === billingResult.athleteId)) || 'selected athlete'} with {billingResult.strategy}.</p>
                 <strong>{formatCurrency(billingResult.finalAmount)}</strong>
               </div>
             )}
