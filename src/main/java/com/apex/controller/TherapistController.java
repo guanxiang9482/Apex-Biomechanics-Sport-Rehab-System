@@ -361,6 +361,7 @@ public class TherapistController {
 
         ClinicalReport report = new ClinicalReport(
                 therapistId, reportType, description);
+        report.submit();
         clinicalReportRepository.save(report);
 
         return ResponseEntity.ok(Map.of(

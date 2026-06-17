@@ -32,6 +32,7 @@ function AthleteDashboard() {
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [sessionHistory, setSessionHistory] = useState([]);
   const [metrics, setMetrics] = useState([]);
+  const [medicalRecords, setMedicalRecords] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [athleteProfile, setAthleteProfile] = useState(null);
   const [therapists, setTherapists] = useState([]);
@@ -61,11 +62,12 @@ function AthleteDashboard() {
       ]);
 
       const athleteId = profile.athleteId;
-      const [today, upcoming, history, recoveryMetrics, athleteInvoices] = await Promise.all([
+      const [today, upcoming, history, recoveryMetrics, medicalHistory, athleteInvoices] = await Promise.all([
         athlete.getTodaySessions(athleteId),
         athlete.getUpcomingSessions(athleteId),
         athlete.getSessionHistory(athleteId),
         athlete.getRecoveryMetrics(athleteId),
+        athlete.getMedicalRecords(athleteId),
         athlete.getInvoices(athleteId),
       ]);
 
@@ -76,6 +78,7 @@ function AthleteDashboard() {
       setUpcomingSessions(upcoming);
       setSessionHistory(history);
       setMetrics(recoveryMetrics);
+      setMedicalRecords(medicalHistory);
       setInvoices(athleteInvoices);
       setNoticeList(userNotifications);
       setProfileForm({
@@ -303,6 +306,7 @@ function AthleteDashboard() {
     sessions: 'Sessions',
     profile: 'Profile',
     metrics: 'Recovery Metrics',
+    medicalRecords: 'Medical Records',
     invoices: 'Invoices',
     notifications: 'Notifications',
   }[activeSection];
@@ -323,6 +327,7 @@ function AthleteDashboard() {
           <button className={activeSection === 'sessions' ? 'active' : ''} onClick={() => setActiveSection('sessions')}>Sessions</button>
           <button className={activeSection === 'profile' ? 'active' : ''} onClick={() => setActiveSection('profile')}>Profile</button>
           <button className={activeSection === 'metrics' ? 'active' : ''} onClick={() => setActiveSection('metrics')}>Metrics</button>
+          <button className={activeSection === 'medicalRecords' ? 'active' : ''} onClick={() => setActiveSection('medicalRecords')}>Medical</button>
           <button className={activeSection === 'invoices' ? 'active' : ''} onClick={() => setActiveSection('invoices')}>Invoices</button>
           <button className={activeSection === 'notifications' ? 'active' : ''} onClick={() => setActiveSection('notifications')}>Notifications</button>
         </nav>
@@ -550,6 +555,28 @@ function AthleteDashboard() {
                     <div><span>Posture Score</span><strong>{record.postureScore}</strong></div>
                     <p>{record.treatmentNote || record.notes || 'No notes recorded.'}</p>
                     <small>{formatDateTime(record.recordedAt)}</small>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeSection === 'medicalRecords' && (
+          <section className="section">
+            {medicalRecords.length === 0 ? (
+              <p className="empty-state">No medical records available yet.</p>
+            ) : (
+              <div className="card-list">
+                {medicalRecords.map((record) => (
+                  <article className="card compact-card" key={record.recordId}>
+                    <div className="card-topline">
+                      <h3>Medical Record #{record.recordId}</h3>
+                      <span className="status-badge status-completed">Clinical</span>
+                    </div>
+                    <p>{record.diagnosisNotes || 'No diagnosis notes recorded.'}</p>
+                    <small>Created {formatDateTime(record.createdAt)} by therapist #{record.createdByTherapist}</small>
+                    <small>Updated {formatDateTime(record.updatedAt)}</small>
                   </article>
                 ))}
               </div>

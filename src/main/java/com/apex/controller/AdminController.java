@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +25,7 @@ import com.apex.domain.FacilityStatus;
 import com.apex.domain.Invoice;
 import com.apex.domain.InvoiceStatus;
 import com.apex.domain.Physiotherapist;
+import com.apex.domain.ReportStatus;
 import com.apex.domain.Role;
 import com.apex.domain.Session;
 import com.apex.domain.SessionStatus;
@@ -61,6 +63,7 @@ public class AdminController {
     private final ClinicalReportRepository clinicalReportRepository;
     private final UserRepository userRepository;
     private final PhysiotherapistRepository physiotherapistRepository;
+    private final JdbcTemplate jdbc;
 
     public AdminController(
             AdmissionFacade admissionFacade,
@@ -72,7 +75,8 @@ public class AdminController {
             EquipmentRepository equipmentRepository,
             ClinicalReportRepository clinicalReportRepository,
             UserRepository userRepository,
-            PhysiotherapistRepository physiotherapistRepository) {
+            PhysiotherapistRepository physiotherapistRepository,
+            JdbcTemplate jdbc) {
         this.admissionFacade          = admissionFacade;
         this.profileService           = profileService;
         this.sessionService           = sessionService;
@@ -83,6 +87,7 @@ public class AdminController {
         this.clinicalReportRepository = clinicalReportRepository;
         this.userRepository           = userRepository;
         this.physiotherapistRepository = physiotherapistRepository;
+        this.jdbc                     = jdbc;
     }
 
     // UC15 — Admit New Athlete (Facade Pattern showcase)
@@ -420,18 +425,39 @@ public class AdminController {
     }
 
     // UC14 — Approve clinical report
+    @GetMapping("/reports/submitted")
+    public ResponseEntity<?> getSubmittedReports() {
+        return ResponseEntity.ok(
+                clinicalReportRepository.findByStatus(
+                        ReportStatus.SUBMITTED));
+    }
+
     @PutMapping("/reports/{reportId}/approve")
     public ResponseEntity<?> approveReport(
             @PathVariable int reportId,
-            @RequestBody Map<String, Integer> body) {
-        int adminId = body.get("adminId");
-        clinicalReportRepository.findById(reportId)
-                .ifPresent(report -> {
+            @RequestHeader("X-User-Id") int requestUserId) {
+        int adminId = getAdminIdByUserId(requestUserId);
+        return clinicalReportRepository.findById(reportId)
+                .map(report -> {
                     report.approve(adminId);
                     clinicalReportRepository.update(report);
-                });
-        return ResponseEntity.ok(Map.of(
-                "message", "Report #" + reportId + " approved"));
+                    return ResponseEntity.ok(Map.of(
+                            "message",
+                            "Report #" + reportId + " approved"));
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private int getAdminIdByUserId(int userId) {
+        List<Integer> ids = jdbc.query(
+                "SELECT admin_id FROM administrators WHERE user_id = ?",
+                (rs, rowNum) -> rs.getInt("admin_id"),
+                userId);
+        if (ids.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Admin profile not found for this user.");
+        }
+        return ids.get(0);
     }
 
     private ResponseEntity<?> validateStaffManagementTarget(

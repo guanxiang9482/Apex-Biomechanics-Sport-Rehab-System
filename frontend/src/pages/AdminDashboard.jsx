@@ -51,6 +51,7 @@ function AdminDashboard() {
   const [equipment, setEquipment] = useState([]);
   const [therapists, setTherapists] = useState([]);
   const [staff, setStaff] = useState([]);
+  const [submittedReports, setSubmittedReports] = useState([]);
   const [noticeList, setNoticeList] = useState([]);
   const [admissionForm, setAdmissionForm] = useState(initialAdmission);
   const [billingForm, setBillingForm] = useState(initialBilling);
@@ -66,7 +67,7 @@ function AdminDashboard() {
     setMessage(null);
 
     try {
-      const [analyticsData, athleteData, ledgerData, facilityData, therapistData, completedSessionData, staffData, userNotifications] = await Promise.all([
+      const [analyticsData, athleteData, ledgerData, facilityData, therapistData, completedSessionData, staffData, reportData, userNotifications] = await Promise.all([
         admin.getAnalytics(),
         admin.getAllAthletes(),
         admin.getFullLedger(),
@@ -74,6 +75,7 @@ function AdminDashboard() {
         admin.getTherapists(),
         admin.getCompletedSessions(),
         admin.getAllStaff(),
+        admin.getSubmittedReports(),
         notifications.getAll(user.userId),
       ]);
 
@@ -84,6 +86,7 @@ function AdminDashboard() {
       setFacilities(facilityData.length > 0 ? facilityData : fallbackFacilities);
       setTherapists(therapistData);
       setStaff(staffData);
+      setSubmittedReports(reportData);
       setSelectedFacilityId((current) => current || String(facilityData[0]?.facilityId || fallbackFacilities[0].id));
       setAdmissionForm((current) => ({
         ...current,
@@ -299,6 +302,16 @@ function AdminDashboard() {
     }
   };
 
+  const handleApproveReport = async (reportId) => {
+    try {
+      await admin.approveReport(reportId);
+      showMessage('success', `Report #${reportId} approved.`);
+      await loadDashboard();
+    } catch (error) {
+      showMessage('error', error.message);
+    }
+  };
+
   const paidRevenue = ledger
     .filter((invoice) => invoice.status === 'PAID')
     .reduce((sum, invoice) => sum + Number(invoice.finalAmount ?? invoice.amount ?? 0), 0);
@@ -308,6 +321,7 @@ function AdminDashboard() {
     admission: 'Admit Athlete',
     analytics: 'Analytics & Athletes',
     billing: 'Billing & Ledger',
+    reports: 'Report Review',
     staff: 'Staff Management',
     facilities: 'Facilities & Equipment',
     notifications: 'Notifications',
@@ -329,6 +343,7 @@ function AdminDashboard() {
           <button className={activeSection === 'admission' ? 'active' : ''} onClick={() => setActiveSection('admission')}>Admission</button>
           <button className={activeSection === 'analytics' ? 'active' : ''} onClick={() => setActiveSection('analytics')}>Analytics</button>
           <button className={activeSection === 'billing' ? 'active' : ''} onClick={() => setActiveSection('billing')}>Billing</button>
+          <button className={activeSection === 'reports' ? 'active' : ''} onClick={() => setActiveSection('reports')}>Reports</button>
           <button className={activeSection === 'staff' ? 'active' : ''} onClick={() => setActiveSection('staff')}>Staff</button>
           <button className={activeSection === 'facilities' ? 'active' : ''} onClick={() => setActiveSection('facilities')}>Facilities</button>
           <button className={activeSection === 'notifications' ? 'active' : ''} onClick={() => setActiveSection('notifications')}>Notifications</button>
@@ -556,6 +571,36 @@ function AdminDashboard() {
                 <span>UC20</span>
               </div>
               <LedgerTable ledger={ledger} athletes={athletes} />
+            </div>
+          </section>
+        )}
+
+        {activeSection === 'reports' && (
+          <section className="section">
+            <div className="panel">
+              <div className="panel-header">
+                <h2>Submitted Therapist Reports</h2>
+                <span>{submittedReports.length}</span>
+              </div>
+              {submittedReports.length === 0 ? (
+                <p className="empty-state">No submitted reports waiting for review.</p>
+              ) : (
+                <div className="card-list">
+                  {submittedReports.map((report) => (
+                    <article className="card compact-card" key={report.reportId}>
+                      <div className="card-topline">
+                        <h3>{report.reportType || `Report #${report.reportId}`}</h3>
+                        <span className={statusClass(report.status)}>{report.status}</span>
+                      </div>
+                      <p>{report.description}</p>
+                      <small>Submitted by {getTherapistLabel(therapists, report.submitByTherapist)} on {formatDateTime(report.submittedAt)}</small>
+                      <div className="card-actions">
+                        <button className="btn-primary compact" type="button" onClick={() => handleApproveReport(report.reportId)}>Approve Report</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -797,6 +842,12 @@ function formatAthleteName(athlete) {
   if (!athlete) return '';
   const name = athlete.fullname || athlete.fullName || athlete.username || 'Unnamed athlete';
   return athlete.username && athlete.username !== name ? `${name} (${athlete.username})` : name;
+}
+
+function getTherapistLabel(therapists, therapistId) {
+  const therapist = therapists.find((item) => item.therapistId === therapistId);
+  if (!therapist) return `Therapist #${therapistId}`;
+  return therapist.fullname || therapist.fullName || therapist.username || `Therapist #${therapistId}`;
 }
 
 function normalizeName(value) {

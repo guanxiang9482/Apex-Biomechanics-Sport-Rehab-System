@@ -3,6 +3,7 @@ package com.apex.controller;
 import com.apex.domain.*;
 import com.apex.repository.interfaces.UserRepository;
 import com.apex.service.AccountService;
+import com.apex.service.ProfileService;
 import com.apex.service.observer.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,13 +22,16 @@ public class AuthController {
     private final AccountService accountService;
     private final NotificationEngine notificationEngine;
     private final UserRepository userRepository;
+    private final ProfileService profileService;
 
     public AuthController(AccountService accountService,
                           NotificationEngine notificationEngine,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          ProfileService profileService) {
         this.accountService     = accountService;
         this.notificationEngine = notificationEngine;
         this.userRepository     = userRepository;
+        this.profileService     = profileService;
     }
 
     // UC1 — Self-registration (Athletes only)
@@ -44,6 +48,15 @@ public class AuthController {
             User user = accountService.createAccount(
                     username, password, email,
                     fullname, contact, Role.ATHLETE);
+
+            profileService.getProfileByUserId(user.getUserId())
+                    .ifPresent(athlete -> {
+                        applyOptionalPositiveDouble(body.get("bodyWeightKg"),
+                                athlete::setBodyWeightKg);
+                        applyOptionalPositiveDouble(body.get("heightCm"),
+                                athlete::setHeightCm);
+                        profileService.updateProfile(athlete);
+                    });
 
             notificationEngine.subscribe(
                     new AthleteObserver(user.getUserId(),
@@ -123,5 +136,12 @@ public class AuthController {
 
         return ResponseEntity.ok(Map.of(
                 "message", "Password reset successfully"));
+    }
+
+    private void applyOptionalPositiveDouble(String value,
+                                             java.util.function.DoubleConsumer setter) {
+        if (value == null || value.isBlank()) return;
+        double parsed = Double.parseDouble(value);
+        if (parsed > 0) setter.accept(parsed);
     }
 }

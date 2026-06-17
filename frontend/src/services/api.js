@@ -39,8 +39,10 @@ async function request(endpoint, method = 'GET', body = null) {
 }
 
 export const auth = {
-  register: (username, password, email, fullName) =>
-    request('/auth/register', 'POST', { username, password, email, fullName }),
+  register: (username, password, email, fullName, contact, bodyWeightKg, heightCm) =>
+    request('/auth/register', 'POST', {
+      username, password, email, fullName, contact, bodyWeightKg, heightCm,
+    }),
   login: (username, password) =>
     request('/auth/login', 'POST', { username, password }),
   logout: (userId) =>
@@ -78,6 +80,8 @@ export const athlete = {
     request(`/athlete/sessions/${sessionId}/reschedule`, 'PUT', { athleteId, newDate }),
   getRecoveryMetrics: (athleteId) =>
     request(`/athlete/${athleteId}/recovery-metrics`),
+  getMedicalRecords: (athleteId) =>
+    request(`/athlete/${athleteId}/medical-records`),
   getInvoices: (athleteId) =>
     request(`/athlete/${athleteId}/invoices`),
 };
@@ -146,8 +150,10 @@ export const admin = {
     request(`/admin/staff/${userId}`, 'DELETE'),
   getFullLedger: () =>
     request('/admin/ledger'),
-  approveReport: (reportId, adminId) =>
-    request(`/admin/reports/${reportId}/approve`, 'PUT', { adminId }),
+  getSubmittedReports: () =>
+    request('/admin/reports/submitted'),
+  approveReport: (reportId) =>
+    request(`/admin/reports/${reportId}/approve`, 'PUT'),
 };
 
 export const notifications = {

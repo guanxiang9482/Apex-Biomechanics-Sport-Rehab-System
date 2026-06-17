@@ -291,6 +291,35 @@ function TherapistDashboard() {
                 ))}
               </div>
             )}
+
+            <div className="panel">
+              <div className="panel-header">
+                <h2>All Assigned Sessions</h2>
+                <span>{sessionList.length}</span>
+              </div>
+              {sessionList.length === 0 ? (
+                <p className="empty-state">No assigned sessions found.</p>
+              ) : (
+                <div className="card-grid">
+                  {sessionList.map((session) => (
+                    <article className="card" key={session.sessionId}>
+                      <div className="card-topline">
+                        <h3>{session.sessionType || 'Rehab Session'}</h3>
+                        <span className={statusClass(session.status)}>{session.status}</span>
+                      </div>
+                      <p>{formatSessionAthleteName(session, athletes)}</p>
+                      <p>{formatDateTime(session.sessionDate)}</p>
+                      <p>Facility #{session.facilityId || '-'} - {session.durationMins} minutes</p>
+                      <div className="card-actions">
+                        <button className="btn-secondary" type="button" onClick={() => handleStatusUpdate(session.sessionId, 'COMPLETED')}>Complete</button>
+                        <button className="btn-secondary" type="button" onClick={() => handleStatusUpdate(session.sessionId, 'PENDING_FOLLOWUP')}>Follow Up</button>
+                        <button className="btn-danger" type="button" onClick={() => handleStatusUpdate(session.sessionId, 'CANCELLED')}>Cancel</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
           </section>
         )}
 

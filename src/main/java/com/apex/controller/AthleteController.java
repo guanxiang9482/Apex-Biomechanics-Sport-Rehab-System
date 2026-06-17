@@ -3,6 +3,7 @@ package com.apex.controller;
 import com.apex.domain.*;
 import com.apex.repository.interfaces.BiomechanicsRepository;
 import com.apex.repository.interfaces.FacilityRepository;
+import com.apex.repository.interfaces.MedicalRecordRepository;
 import com.apex.repository.interfaces.PhysiotherapistRepository;
 import com.apex.service.PaymentService;
 import com.apex.service.ProfileService;
@@ -30,19 +31,22 @@ public class AthleteController {
     private final PaymentService paymentService;
     private final FacilityRepository facilityRepository;
     private final PhysiotherapistRepository physiotherapistRepository;
+    private final MedicalRecordRepository medicalRecordRepository;
 
     public AthleteController(ProfileService profileService,
                              SessionService sessionService,
                              BiomechanicsRepository biomechanicsRepository,
                              PaymentService paymentService,
                              FacilityRepository facilityRepository,
-                             PhysiotherapistRepository physiotherapistRepository) {
+                             PhysiotherapistRepository physiotherapistRepository,
+                             MedicalRecordRepository medicalRecordRepository) {
         this.profileService         = profileService;
         this.sessionService         = sessionService;
         this.biomechanicsRepository = biomechanicsRepository;
         this.paymentService         = paymentService;
         this.facilityRepository     = facilityRepository;
         this.physiotherapistRepository = physiotherapistRepository;
+        this.medicalRecordRepository = medicalRecordRepository;
     }
 
     // UC6 — Get profile by athleteId
@@ -268,6 +272,17 @@ public class AthleteController {
         if (accessError != null) return accessError;
         return ResponseEntity.ok(
                 biomechanicsRepository.findByAthleteId(athleteId));
+    }
+
+    // UC8/UC14 — Athlete can view own medical records
+    @GetMapping("/{athleteId}/medical-records")
+    public ResponseEntity<?> getMedicalRecords(
+            @PathVariable int athleteId,
+            @RequestHeader("X-User-Id") int userId) {
+        ResponseEntity<?> accessError = requireOwnedAthlete(userId, athleteId);
+        if (accessError != null) return accessError;
+        return ResponseEntity.ok(
+                medicalRecordRepository.findByAthleteId(athleteId));
     }
 
     // UC20 — Own invoices

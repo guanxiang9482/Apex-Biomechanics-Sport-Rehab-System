@@ -3,6 +3,7 @@ package com.apex.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
@@ -30,6 +31,9 @@ import com.apex.service.observer.NotificationEngine;
  */
 @Service
 public class SessionService {
+
+    private static final ZoneId APP_ZONE =
+            ZoneId.of("Asia/Kuala_Lumpur");
 
     private final SessionRepository sessionRepository;
     private final NotificationEngine notificationEngine;
@@ -71,7 +75,7 @@ public class SessionService {
     public Session scheduleInitialSession(int athleteId,
                                           int therapistId,
                                           int facilityId) {
-        LocalDateTime initial = LocalDateTime.now()
+        LocalDateTime initial = now()
                 .plusDays(1).withHour(9).withMinute(0)
                 .withSecond(0).withNano(0);
         return bookSession(athleteId, therapistId, facilityId,
@@ -146,7 +150,7 @@ public class SessionService {
 
     // UC5 — Today's sessions
     public List<Session> getTodaySessions() {
-        return sessionRepository.findByDate(LocalDate.now());
+        return sessionRepository.findByDate(today());
     }
 
     public List<Session> getAllSessions() {
@@ -157,7 +161,7 @@ public class SessionService {
         return sessionRepository.findByAthleteId(athleteId)
                 .stream()
                 .filter(s -> s.getSessionDate().toLocalDate()
-                        .equals(LocalDate.now()))
+                        .equals(today()))
                 .toList();
     }
 
@@ -167,7 +171,7 @@ public class SessionService {
         return sessionRepository.findByTherapistId(therapistId)
                 .stream()
                 .filter(s -> s.getSessionDate().toLocalDate()
-                        .equals(LocalDate.now()))
+                        .equals(today()))
                 .toList();
     }
 
@@ -257,10 +261,18 @@ public class SessionService {
         return IntStream.rangeClosed(9, 16)
                 .mapToObj(hour -> LocalDateTime.of(date,
                         LocalTime.of(hour, 0)))
-                .filter(slot -> slot.isAfter(LocalDateTime.now()))
+                .filter(slot -> slot.isAfter(now()))
                 .filter(slot -> !hasBookingConflict(therapistId,
                         facilityId, slot, durationMins, currentSessionId))
                 .toList();
+    }
+
+    private LocalDate today() {
+        return LocalDate.now(APP_ZONE);
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(APP_ZONE);
     }
 
     public void cancelInitialSession(int athleteId) {

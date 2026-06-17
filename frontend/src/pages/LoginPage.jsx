@@ -9,6 +9,9 @@ const emptyForm = {
   password: '',
   email: '',
   fullName: '',
+  contact: '',
+  bodyWeightKg: '',
+  heightCm: '',
   newPassword: '',
 };
 
@@ -66,6 +69,9 @@ function LoginPage() {
         form.password,
         form.email.trim(),
         form.fullName.trim(),
+        form.contact.trim(),
+        form.bodyWeightKg,
+        form.heightCm,
       );
       setForm(emptyForm);
       setActiveTab('login');
@@ -211,6 +217,18 @@ function LoginPage() {
               <label>
                 Email
                 <input name="email" type="email" placeholder="client@email.com" value={form.email} onChange={updateForm} required />
+              </label>
+              <label>
+                Contact
+                <input name="contact" type="tel" placeholder="Phone number" value={form.contact} onChange={updateForm} required />
+              </label>
+              <label>
+                Body weight (kg)
+                <input name="bodyWeightKg" type="number" min="1" step="0.1" placeholder="70" value={form.bodyWeightKg} onChange={updateForm} required />
+              </label>
+              <label>
+                Height (cm)
+                <input name="heightCm" type="number" min="1" step="0.1" placeholder="175" value={form.heightCm} onChange={updateForm} required />
               </label>
               <label>
                 Username
