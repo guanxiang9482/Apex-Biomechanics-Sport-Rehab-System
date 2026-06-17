@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { admin, auth, notifications } from '../services/api';
 import { formatCurrency, formatDateTime, statusClass } from '../utils/format';
+import { getNotificationId, getNotificationMessage, getNotificationTimestamp, isNotificationRead } from '../utils/notifications';
 import './Dashboard.css';
 
 const initialAdmission = {
@@ -735,14 +736,14 @@ function AdminDashboard() {
             ) : (
               <div className="card-list">
                 {noticeList.map((notice) => {
-                  const id = notice.notification_id ?? notice.notificationId;
-                  const isRead = notice.is_read === true || notice.is_read === 1;
+                  const id = getNotificationId(notice);
+                  const isRead = isNotificationRead(notice);
                   return (
-                    <article className={`card compact-card ${isRead ? '' : 'highlight-card'}`} key={id}>
+                    <article className={`card compact-card ${isRead ? '' : 'highlight-card'}`} key={id ?? `${getNotificationMessage(notice)}-${getNotificationTimestamp(notice)}`}>
                       <h3>{isRead ? 'Read' : 'Unread'} Notification</h3>
-                      <p>{notice.event_message ?? notice.eventMessage}</p>
-                      <small>{formatDateTime(notice.created_at ?? notice.createdAt)}</small>
-                      {!isRead && <button className="btn-secondary" type="button" onClick={() => handleReadNotification(id)}>Mark as Read</button>}
+                      <p>{getNotificationMessage(notice)}</p>
+                      <small>{formatDateTime(getNotificationTimestamp(notice))}</small>
+                      {!isRead && id && <button className="btn-secondary" type="button" onClick={() => handleReadNotification(id)}>Mark as Read</button>}
                     </article>
                   );
                 })}

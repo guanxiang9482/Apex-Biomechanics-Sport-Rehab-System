@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { athlete, auth, notifications } from '../services/api';
 import { formatCurrency, formatDateTime, statusClass } from '../utils/format';
+import { getNotificationId, getNotificationMessage, getNotificationTimestamp, isNotificationRead } from '../utils/notifications';
 import './Dashboard.css';
 
 const initialBooking = {
@@ -292,7 +293,7 @@ function AthleteDashboard() {
     }
   };
 
-  const unreadCount = noticeList.filter((item) => item.is_read === false || item.is_read === 0).length;
+  const unreadCount = noticeList.filter((item) => !isNotificationRead(item)).length;
   const paidTotal = invoices
     .filter((invoice) => invoice.status === 'PAID')
     .reduce((sum, invoice) => sum + Number(invoice.finalAmount ?? invoice.amount ?? 0), 0);
@@ -569,14 +570,14 @@ function AthleteDashboard() {
             ) : (
               <div className="card-list">
                 {noticeList.map((notice) => {
-                  const id = notice.notification_id ?? notice.notificationId;
-                  const isRead = notice.is_read === true || notice.is_read === 1;
+                  const id = getNotificationId(notice);
+                  const isRead = isNotificationRead(notice);
                   return (
-                    <article className={`card compact-card ${isRead ? '' : 'highlight-card'}`} key={id}>
+                    <article className={`card compact-card ${isRead ? '' : 'highlight-card'}`} key={id ?? `${getNotificationMessage(notice)}-${getNotificationTimestamp(notice)}`}>
                       <h3>{isRead ? 'Read' : 'Unread'} Notification</h3>
-                      <p>{notice.event_message ?? notice.eventMessage}</p>
-                      <small>{formatDateTime(notice.created_at ?? notice.createdAt)}</small>
-                      {!isRead && <button className="btn-secondary" type="button" onClick={() => handleReadNotification(id)}>Mark as Read</button>}
+                      <p>{getNotificationMessage(notice)}</p>
+                      <small>{formatDateTime(getNotificationTimestamp(notice))}</small>
+                      {!isRead && id && <button className="btn-secondary" type="button" onClick={() => handleReadNotification(id)}>Mark as Read</button>}
                     </article>
                   );
                 })}
