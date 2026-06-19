@@ -49,4 +49,3 @@ Frontend runs on http://localhost:5173
 2. Login as Therapist → Log Biomechanical Data → Update Session Status **(Observer fires)**
 3. Login as Admin → Process Billing → Select Strategy **(Strategy Pattern)**
 4. Check Notifications **(Observer Pattern)**
-5. Note single DBConnection instance throughout **(Singleton Pattern)**
